@@ -1,0 +1,13 @@
+node_modules
+.nuxt
+.output
+.git
+.env
+.github
+.vscode
+.idea
+start.sh
+*.md
+.gitignore
+docker-compose.yml
+nginx 
