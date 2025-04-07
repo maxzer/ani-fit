@@ -1,5 +1,14 @@
 <template>
   <div class="date-picker-container">
+    <!-- Отладочная информация -->
+    <div class="debug-info-panel">
+      <div class="debug-status">Отладка: {{ requestStatus }}</div>
+      <div v-if="lastError" class="debug-error">
+        <div class="error-title">Ошибка:</div>
+        <div class="error-message">{{ lastError }}</div>
+      </div>
+    </div>
+
     <VDatePicker
       v-model="selectedDate"
       :masks="masks"
@@ -9,9 +18,9 @@
       class="date-picker"
       is-expanded
       :is-dark="isDarkTheme"
-      color="gray"
+      :color="color"
       :minute-increment="30"
-      :time-accuracy="'minute'"
+      :time-accuracy="1"
       :is24hr="true"
       :disabled-nav-directions="['left', 'right']"
       :is-popover-visible="false"
@@ -50,13 +59,20 @@
     </div>
     
     <div class="selected-date-wrapper" v-if="selectedDate">
-      <div class="selected-date">
+      <div class="selected-date" :style="{ backgroundColor: color + '15' }">
         <span class="date-label">Выбранная дата:</span>
         <span class="date-value">{{ formattedDate }}</span>
       </div>
       
-      <button class="confirm-button" @click="confirmDate">
-        Подтвердить
+      <button 
+        class="confirm-button" 
+        @click="confirmDate" 
+        :disabled="isLoading"
+        :class="{ 'loading': isLoading }"
+        :style="{ backgroundColor: isLoading ? 'var(--tg-theme-secondary-bg-color, #f0f0f0)' : color }"
+      >
+        <span v-if="!isLoading">Подтвердить</span>
+        <span v-else class="button-spinner">Обработка...</span>
       </button>
     </div>
   </div>
@@ -65,11 +81,42 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
 import 'v-calendar/style.css';
+import { fetchApi } from '../utils/api';
+import { useRuntimeConfig } from '#app';
+
+const props = defineProps({
+  color: {
+    type: String,
+    default: '#4caf50' // Зеленый по умолчанию
+  },
+  serviceName: {
+    type: String,
+    default: 'Тренировка'
+  },
+  organizerName: {
+    type: String,
+    default: 'AniFit'
+  },
+  serviceDuration: {
+    type: Number,
+    default: 60 // Длительность в минутах
+  },
+  organizerLocation: {
+    type: String,
+    default: 'AniFit'
+  },
+  userEmail: {
+    type: String,
+    default: ''
+  }
+});
 
 const selectedDate = ref(null);
 const calendarMode = ref('date');
-const emit = defineEmits(['dateSelected', 'confirmed']);
+const emit = defineEmits(['dateSelected', 'confirmed', 'debug-log']);
 const isDarkTheme = ref(false);
+const isLoading = ref(false); // Состояние загрузки для блокировки повторных запросов
+const isSubmitted = ref(false); // Флаг для отслеживания успешной отправки
 
 // Данные для выбора времени
 const selectedHour = ref(10);
@@ -88,6 +135,15 @@ const timeSlots = [
   { label: 'Вечер 20:30', value: '20:30' }
 ];
 
+// Генерируем уникальный ID запроса для предотвращения дублирования
+const requestId = ref(Date.now().toString());
+
+// Отладочная информация
+const debugLogs = ref([]);
+const lastError = ref('');
+const requestStatus = ref('Готов');
+const maxLogs = 10;
+
 // Функция выбора временного слота
 const selectTimeSlot = (timeSlot) => {
   selectedTimeSlot.value = timeSlot;
@@ -101,11 +157,20 @@ const selectTimeSlot = (timeSlot) => {
 const updateDateWithTime = () => {
   if (!selectedDate.value) return;
   
-  const date = new Date(selectedDate.value);
-  date.setHours(selectedHour.value);
-  date.setMinutes(selectedMinute.value);
-  date.setSeconds(0);
-  selectedDate.value = date;
+  try {
+    const date = new Date(selectedDate.value);
+    if (isNaN(date.getTime())) {
+      console.error('Невалидная дата:', selectedDate.value);
+      return;
+    }
+    
+    date.setHours(selectedHour.value);
+    date.setMinutes(selectedMinute.value);
+    date.setSeconds(0);
+    selectedDate.value = date;
+  } catch (error) {
+    console.error('Ошибка при обновлении даты:', error);
+  }
 };
 
 // Следим за изменением часов и минут для обновления даты
@@ -149,37 +214,55 @@ watch(selectedDate, (newValue, oldValue) => {
 
 // Проверяем тему Telegram для адаптации стилей
 onMounted(() => {
-  // Устанавливаем текущую дату как активную
-  const today = new Date();
-  selectedDate.value = today;
-  
-  // Устанавливаем режим выбора даты и времени
-  calendarMode.value = 'datetime';
-  
-  // Установка времени для выбранной даты
-  const currentHour = today.getHours();
-  
-  // Установка часа в допустимом диапазоне
-  if (currentHour < 10) {
-    selectedHour.value = 10; // Если текущий час меньше 10, устанавливаем 10
-  } else if (currentHour > 22) {
-    selectedHour.value = 22; // Если текущий час больше 22, устанавливаем 22
-  } else {
-    selectedHour.value = currentHour; // Иначе используем текущий час
-  }
-  
-  // Округляем минуты до ближайшего допустимого значения (0 или 30)
-  selectedMinute.value = today.getMinutes() < 30 ? 0 : 30;
-  
-  // Обновляем дату с выбранным временем
-  updateDateWithTime();
-  
-  if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
-    const colorScheme = window.Telegram.WebApp.colorScheme;
-    isDarkTheme.value = colorScheme === 'dark';
-  } else {
-    // Проверяем системную цветовую схему как запасной вариант
-    isDarkTheme.value = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  try {
+    // Устанавливаем текущую дату как активную
+    const today = new Date();
+    
+    // Проверяем, что дата валидна
+    if (isNaN(today.getTime())) {
+      console.error('Невалидная текущая дата при инициализации');
+      // Используем запасной вариант с текущей датой через new Date()
+      selectedDate.value = new Date();
+    } else {
+      selectedDate.value = today;
+    }
+    
+    // Устанавливаем режим выбора даты и времени
+    calendarMode.value = 'datetime';
+    
+    // Установка времени для выбранной даты
+    const currentHour = today.getHours();
+    
+    // Установка часа в допустимом диапазоне
+    if (currentHour < 10) {
+      selectedHour.value = 10; // Если текущий час меньше 10, устанавливаем 10
+    } else if (currentHour > 22) {
+      selectedHour.value = 22; // Если текущий час больше 22, устанавливаем 22
+    } else {
+      selectedHour.value = currentHour; // Иначе используем текущий час
+    }
+    
+    // Округляем минуты до ближайшего допустимого значения (0 или 30)
+    selectedMinute.value = today.getMinutes() < 30 ? 0 : 30;
+    
+    // Обновляем дату с выбранным временем
+    updateDateWithTime();
+    
+    // Определяем тему
+    if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
+      const colorScheme = window.Telegram.WebApp.colorScheme;
+      isDarkTheme.value = colorScheme === 'dark';
+    } else {
+      // Проверяем системную цветовую схему как запасной вариант
+      isDarkTheme.value = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+  } catch (error) {
+    console.error('Ошибка при инициализации DatePicker:', error);
+    // В случае ошибки устанавливаем безопасные значения по умолчанию
+    selectedDate.value = new Date();
+    calendarMode.value = 'datetime';
+    selectedHour.value = 12;
+    selectedMinute.value = 0;
   }
 });
 
@@ -191,7 +274,8 @@ const masks = {
   data: { timeFormat: 24 }
 };
 
-const attributes = [
+// Пересчитываем атрибуты для корректного отображения текущего дня
+const attributes = computed(() => [
   {
     key: 'today',
     highlight: {
@@ -200,7 +284,7 @@ const attributes = [
     },
     dates: new Date(),
   }
-];
+]);
 
 // Форматируем дату для отображения
 const formattedDate = computed(() => {
@@ -219,18 +303,370 @@ const formattedDate = computed(() => {
 
 // Обработчик выбора даты
 const dateSelected = (date) => {
-  // Если дата была сброшена, возвращаем режим к выбору только даты
-  if (!date) {
-    calendarMode.value = 'date';
-    selectedTimeSlot.value = null;
+  try {
+    // Если дата была сброшена, возвращаем режим к выбору только даты
+    if (!date) {
+      calendarMode.value = 'date';
+      selectedTimeSlot.value = null;
+      return;
+    }
+    
+    // Проверяем, что дата валидна
+    const checkDate = new Date(date);
+    if (isNaN(checkDate.getTime())) {
+      console.error('Невалидная дата передана в dateSelected:', date);
+      return;
+    }
+    
+    emit('dateSelected', date);
+  } catch (error) {
+    console.error('Ошибка в обработчике dateSelected:', error);
   }
-  emit('dateSelected', date);
+};
+
+// Функция для отправки отладочной информации
+const sendDebugLog = (message, type = 'info') => {
+  console.log(`[DatePicker] ${message}`);
+  
+  // Добавляем в локальный лог
+  const now = new Date();
+  const time = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+  
+  debugLogs.value.unshift({
+    time,
+    message,
+    type
+  });
+  
+  // Ограничиваем количество логов
+  if (debugLogs.value.length > maxLogs) {
+    debugLogs.value = debugLogs.value.slice(0, maxLogs);
+  }
+  
+  // Если это ошибка, сохраняем её отдельно
+  if (type === 'error') {
+    lastError.value = message;
+    requestStatus.value = 'Ошибка';
+  } else if (message.includes('успешно')) {
+    requestStatus.value = 'Успех';
+  } else if (message.includes('Отправка')) {
+    requestStatus.value = 'Отправка...';
+  }
+  
+  // Отправляем наверх
+  emit('debug-log', { message, type });
 };
 
 // Обработчик подтверждения даты
-const confirmDate = () => {
-  if (selectedDate.value) {
-    emit('confirmed', selectedDate.value);
+const confirmDate = async () => {
+  if (isSubmitted.value || isLoading.value) {
+    sendDebugLog('Запрос уже был отправлен, предотвращаем повторную отправку');
+    return;
+  }
+
+  try {
+    isLoading.value = true;
+    const currentRequestId = requestId.value;
+    
+    sendDebugLog(`Подтверждение даты: ${selectedDate.value} ${selectedTimeSlot.value}`);
+    
+    // Собираем данные о событии
+    const summary = `${props.organizerName} - ${props.serviceName}`;
+    const description = `Запись на ${props.serviceName}`;
+    
+    // Вычисляем дату и время начала события
+    const startDateTime = new Date(selectedDate.value);
+    startDateTime.setHours(selectedHour.value);
+    startDateTime.setMinutes(selectedMinute.value);
+    
+    // Вычисляем дату и время окончания события (добавляем продолжительность)
+    const endDateTime = new Date(startDateTime);
+    endDateTime.setMinutes(endDateTime.getMinutes() + props.serviceDuration);
+    
+    // Форматируем даты в ISO формат для Google Calendar API
+    const startDateTimeISO = startDateTime.toISOString();
+    const endDateTimeISO = endDateTime.toISOString();
+    
+    sendDebugLog(`Начало события: ${startDateTimeISO}`);
+    sendDebugLog(`Конец события: ${endDateTimeISO}`);
+    
+    // Проверяем, запущено ли приложение в Telegram WebApp
+    const isTelegramWebApp = typeof window !== 'undefined' && window.Telegram && window.Telegram.WebApp;
+    sendDebugLog(`Запущено в Telegram WebApp: ${isTelegramWebApp}`);
+    
+    // Данные для добавления события
+    const eventData = {
+      summary,
+      description,
+      startDateTime: startDateTimeISO,
+      endDateTime: endDateTimeISO,
+      location: props.organizerLocation,
+      attendees: [props.userEmail].filter(Boolean),
+      requestId: currentRequestId,
+      color: props.color // Используем цвет из пропсов
+    };
+    
+    sendDebugLog(`Отправка данных события: ${JSON.stringify(eventData).substring(0, 100)}...`);
+    
+    // Функция для выполнения запроса с повторными попытками
+    const fetchWithRetry = async (url, options, retries = 3, delay = 1000) => {
+      try {
+        sendDebugLog(`Попытка запроса к ${url} (осталось попыток: ${retries})`);
+        const response = await fetch(url, options);
+        sendDebugLog(`Получен статус: ${response.status}`);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          sendDebugLog(`Ошибка ответа: ${response.status}, текст: ${errorText}`, 'error');
+          throw new Error(`HTTP error! Status: ${response.status}, Body: ${errorText}`);
+        }
+        
+        return await response.json();
+      } catch (error) {
+        sendDebugLog(`Ошибка запроса: ${error.message}`, 'error');
+        if (error.message.includes('Failed to fetch')) {
+          sendDebugLog('Ошибка сетевого соединения или CORS', 'error');
+        }
+        
+        if (retries > 0) {
+          sendDebugLog(`Повторная попытка через ${delay}мс...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          return fetchWithRetry(url, options, retries - 1, delay * 1.5);
+        }
+        
+        throw error;
+      }
+    };
+    
+    // Отправляем запрос к API для добавления события в календарь
+    let response;
+    
+    // Модифицируем подход к запросу в зависимости от окружения
+    if (isTelegramWebApp && window.telegramApiProxy) {
+      sendDebugLog('Использую Telegram API Proxy для запроса');
+      
+      try {
+        // Используем специальный прокси для Telegram WebApp
+        response = await window.telegramApiProxy.fetch('/api/calendar/add-event', {
+          method: 'POST',
+          body: JSON.stringify(eventData)
+        });
+        sendDebugLog(`Ответ API (через прокси): ${JSON.stringify(response).substring(0, 100)}...`);
+      } catch (proxyError) {
+        sendDebugLog(`Ошибка при использовании прокси: ${proxyError.message}`, 'error');
+        
+        // Запасной вариант - прямой запрос если прокси не сработал
+        sendDebugLog('Использую прямой fetch как запасной вариант');
+        const config = useRuntimeConfig();
+        const baseUrl = config.public.apiBaseUrl || 'https://maxzer.ru';
+        const url = `${baseUrl}/api/calendar/add-event`;
+        sendDebugLog(`URL запроса: ${url}`);
+        
+        try {
+          response = await fetchWithRetry(
+            url,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'Origin': window.location.origin || 'https://t.me',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-Telegram-WebApp': '1',
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache'
+              },
+              body: JSON.stringify(eventData),
+              mode: 'cors',
+              credentials: 'omit',
+              cache: 'no-store',
+              redirect: 'follow'
+            }
+          );
+          
+          sendDebugLog(`Ответ API (прямой fetch): ${JSON.stringify(response).substring(0, 100)}...`);
+        } catch (fetchError) {
+          // Если все попытки неудачны, пробуем с другим методом
+          sendDebugLog(`Все попытки fetch неудачны, пробуем альтернативный метод`, 'error');
+          
+          // Пробуем использовать XMLHttpRequest как альтернативу fetch
+          response = await new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', url, true);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.setRequestHeader('Accept', 'application/json');
+            xhr.setRequestHeader('X-Telegram-WebApp', '1');
+            xhr.setRequestHeader('Origin', window.location.origin || 'https://t.me');
+            
+            xhr.onload = function() {
+              if (xhr.status >= 200 && xhr.status < 300) {
+                try {
+                  const jsonResponse = JSON.parse(xhr.responseText);
+                  sendDebugLog(`Ответ через XMLHttpRequest получен успешно`);
+                  resolve(jsonResponse);
+                } catch (e) {
+                  sendDebugLog(`Ошибка парсинга JSON: ${e.message}`, 'error');
+                  reject(new Error('Ошибка парсинга ответа'));
+                }
+              } else {
+                sendDebugLog(`Ошибка XMLHttpRequest: ${xhr.status} ${xhr.statusText}`, 'error');
+                reject(new Error(`HTTP ошибка: ${xhr.status}`));
+              }
+            };
+            
+            xhr.onerror = function() {
+              sendDebugLog(`Сетевая ошибка XMLHttpRequest`, 'error');
+              reject(new Error('Сетевая ошибка'));
+            };
+            
+            xhr.send(JSON.stringify(eventData));
+            sendDebugLog('Запрос отправлен через XMLHttpRequest');
+          });
+        }
+      }
+    } else if (isTelegramWebApp) {
+      // Прямой запрос если телеграм, но прокси не инициализирован
+      sendDebugLog('Использую прямой fetch запрос для Telegram WebApp');
+      const config = useRuntimeConfig();
+      const baseUrl = config.public.apiBaseUrl || 'https://maxzer.ru';
+      const url = `${baseUrl}/api/calendar/add-event`;
+      sendDebugLog(`Отправка запроса на URL: ${url}`);
+      
+      try {
+        response = await fetchWithRetry(
+          url,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+              'Origin': window.location.origin || 'https://t.me',
+              'X-Requested-With': 'XMLHttpRequest',
+              'X-Telegram-WebApp': '1',
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+              'Pragma': 'no-cache'
+            },
+            body: JSON.stringify(eventData),
+            mode: 'cors',
+            credentials: 'omit',
+            cache: 'no-store'
+          }
+        );
+      } catch (fetchError) {
+        sendDebugLog(`Все попытки fetch неудачны, пробуем через iframe передачу`, 'error');
+        
+        // Экстренный вариант - создаем временный iframe и отправляем через него
+        response = await new Promise((resolve, reject) => {
+          try {
+            const iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            document.body.appendChild(iframe);
+            
+            // Создаем уникальный ID для сообщения
+            const messageId = `event_${Date.now()}`;
+            
+            // Обработчик сообщений от iframe
+            const messageHandler = (event) => {
+              if (event.data && event.data.messageId === messageId) {
+                sendDebugLog(`Получен ответ через iframe: ${JSON.stringify(event.data).substring(0, 100)}...`);
+                window.removeEventListener('message', messageHandler);
+                document.body.removeChild(iframe);
+                
+                if (event.data.error) {
+                  reject(new Error(event.data.error));
+                } else {
+                  resolve(event.data.response);
+                }
+              }
+            };
+            
+            // Регистрируем обработчик сообщений
+            window.addEventListener('message', messageHandler);
+            
+            // Создаем контент для iframe программно, без использования шаблонных строк
+            const scriptContent = `
+                const messageId = "${messageId}";
+                const eventData = ${JSON.stringify(eventData)};
+                const url = "${url}";
+                
+                async function sendRequest() {
+                  try {
+                    const response = await fetch(url, {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                      },
+                      body: JSON.stringify(eventData)
+                    });
+                    
+                    const data = await response.json();
+                    window.parent.postMessage({ messageId, response: data }, "*");
+                  } catch (error) {
+                    window.parent.postMessage({ messageId, error: error.message }, "*");
+                  }
+                }
+                
+                window.onload = sendRequest;
+            `;
+            
+            // Создаем HTML программно без шаблонных строк
+            const html = document.createElement('html');
+            const head = document.createElement('head');
+            const script = document.createElement('script');
+            script.textContent = scriptContent;
+            head.appendChild(script);
+            
+            const body = document.createElement('body');
+            body.textContent = 'Отправка запроса...';
+            
+            html.appendChild(head);
+            html.appendChild(body);
+            
+            const doctype = '<!DOCTYPE html>';
+            const iframeContent = doctype + html.outerHTML;
+            
+            // Загружаем контент в iframe
+            iframe.srcdoc = iframeContent;
+            sendDebugLog('Запрос отправлен через iframe');
+          } catch (iframeError) {
+            sendDebugLog(`Ошибка при отправке через iframe: ${iframeError.message}`, 'error');
+            reject(iframeError);
+          }
+        });
+      }
+    } else {
+      // В обычном веб-приложении используем fetchApi из utils
+      sendDebugLog('Использую fetchApi для веб-приложения');
+      try {
+        response = await fetchApi('/api/calendar/add-event', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(eventData)
+        });
+        sendDebugLog(`Ответ API (fetchApi): ${JSON.stringify(response).substring(0, 100)}...`);
+      } catch (fetchError) {
+        sendDebugLog(`Ошибка fetchApi: ${fetchError.stack || fetchError.message}`, 'error');
+        throw fetchError;
+      }
+    }
+    
+    if (response.success) {
+      sendDebugLog('Событие успешно создано!');
+      isSubmitted.value = true;
+      // Сообщаем родительскому компоненту об успешном подтверждении
+      emit('confirmed', selectedDate.value, response.eventLink);
+    } else {
+      sendDebugLog(`Ошибка при создании события: ${response.error}`, 'error');
+      emit('confirmed', selectedDate.value, null, response.error || 'Ошибка при создании события');
+    }
+  } catch (error) {
+    sendDebugLog(`Ошибка при подтверждении даты: ${error.stack || error.message}`, 'error');
+    emit('confirmed', selectedDate.value, null, error.message || 'Ошибка при подтверждении даты');
+  } finally {
+    isLoading.value = false;
   }
 };
 </script>
@@ -285,7 +721,7 @@ const confirmDate = () => {
 
 .confirm-button {
   background-color: var(--tg-theme-button-color, #2481cc);
-  color: var(--tg-theme-button-text-color, #ffffff);
+  color: white;
   border: none;
   border-radius: 12px;
   padding: 14px;
@@ -300,9 +736,36 @@ const confirmDate = () => {
   opacity: 0.95;
 }
 
-.confirm-button:active {
-  transform: translateY(0);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+.confirm-button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.confirm-button.loading {
+  background-color: var(--tg-theme-secondary-bg-color, #f0f0f0);
+  color: var(--tg-theme-hint-color, #999999);
+}
+
+.button-spinner {
+  display: inline-flex;
+  align-items: center;
+}
+
+.button-spinner::after {
+  content: "";
+  width: 16px;
+  height: 16px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  margin-left: 8px;
+  animation: spinner 0.8s linear infinite;
+}
+
+@keyframes spinner {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .select-date-button {
@@ -337,20 +800,24 @@ const confirmDate = () => {
 :deep(.vc-weeks) {
   width: 100% !important;
   padding: 0 8px;
+  display: grid !important;
+  grid-template-rows: repeat(auto-fit, minmax(40px, auto)) !important;
 }
 
-/* Скрываем последнюю неделю, если она пустая */
-:deep(.vc-weeks .vc-week:last-child) {
-  visibility: hidden;
-  display: none;
-  height: 0;
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
+/* Принудительно обрезаем лишние строки календаря */
+:deep(.vc-weeks) {
+  max-height: 290px !important; /* Высота для 6 строк (включая заголовки) */
+  overflow: hidden !important;
+}
+
+/* Убираем стандартный grid для возможности управления высотой */
+:deep(.vc-week) {
+  display: flex !important;
 }
 
 :deep(.vc-day) {
-  min-height: 42px;
+  flex: 1 !important;
+  min-height: 42px !important;
   transition: all 0.15s ease;
 }
 
@@ -571,5 +1038,51 @@ const confirmDate = () => {
   color: var(--tg-theme-text-color, #333333) !important;
   font-weight: bold !important;
   border-radius: 12px !important;
+}
+
+/* Стили для отладочной панели */
+.date-picker-container {
+  position: relative;
+}
+
+.debug-info-panel {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background-color: rgba(30, 30, 30, 0.9);
+  color: white;
+  border-radius: 4px;
+  padding: 8px;
+  margin-bottom: 10px;
+  font-family: monospace;
+  font-size: 12px;
+  border-left: 3px solid #ff5722;
+}
+
+.debug-status {
+  font-weight: bold;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background-color: #333;
+  display: inline-block;
+}
+
+.debug-error {
+  margin-top: 5px;
+  background-color: rgba(244, 67, 54, 0.2);
+  padding: 8px;
+  border-radius: 4px;
+  border-left: 3px solid #f44336;
+}
+
+.error-title {
+  font-weight: bold;
+  color: #f44336;
+  margin-bottom: 4px;
+}
+
+.error-message {
+  color: #ff8a80;
+  word-break: break-word;
 }
 </style> 

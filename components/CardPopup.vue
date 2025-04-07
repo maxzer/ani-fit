@@ -2,7 +2,7 @@
   <Transition name="popup">
     <div v-if="isVisible" class="popup-overlay" @click.self="closePopup">
       <div class="popup-content" @click.stop>
-        <div class="popup-header">
+        <div class="popup-header" :style="{ borderBottomColor: color + '30' }">
           <h2>{{ title }}</h2>
           <button class="close-button" @click="closePopup">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -17,20 +17,31 @@
             v-if="showDatePicker" 
             @dateSelected="handleDateSelected" 
             @confirmed="handleDateConfirmed" 
+            @debug-log="handleDebugLog"
             class="full-width-calendar"
+            :color="color"
+            :serviceName="title"
+            :organizerName="'AniFit'"
+            :serviceDuration="60"
+            :organizerLocation="'AniFit Студия'"
+            :userEmail="userEmail"
           />
           
-          <!-- Отображение выбранной даты после подтверждения -->
-          <div v-if="confirmedDate" class="confirmed-date">
-            <div class="confirmation-icon">
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+          <!-- Индикатор загрузки -->
+          <div v-if="isLoading" class="loading-indicator">
+            <div class="spinner" :style="{ borderTopColor: color }"></div>
+            <p>Добавление в календарь...</p>
+          </div>
+          
+          <!-- Уведомление -->
+          <div v-if="notification.show" class="notification" :class="notification.type">
+            <p>{{ notification.message }}</p>
+            <button @click="notification.show = false" class="notification-close">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
               </svg>
-            </div>
-            <div class="confirmation-text">
-              <p>Вы успешно запланировали <strong>{{ title }}</strong> на <strong>{{ formatDate(confirmedDate) }}</strong></p>
-            </div>
+            </button>
           </div>
         </div>
       </div>
@@ -54,14 +65,43 @@ const props = defineProps({
   showDatePicker: {
     type: Boolean,
     default: true
+  },
+  color: {
+    type: String,
+    default: '#4caf50' // Зеленый по умолчанию
+  },
+  userEmail: {
+    type: String,
+    default: ''
   }
 });
 
-const emit = defineEmits(['close', 'dateConfirmed']);
+const emit = defineEmits(['close', 'dateConfirmed', 'debug-log']);
 
-// Состояние для отслеживания выбранной и подтвержденной даты
+// Состояние для отслеживания выбранной даты
 const selectedDate = ref(null);
-const confirmedDate = ref(null);
+const isLoading = ref(false);
+
+// Состояние для уведомлений
+const notification = ref({
+  show: false,
+  message: '',
+  type: 'success'
+});
+
+// Показать уведомление
+const showNotification = (message, type = 'success') => {
+  notification.value = {
+    show: true,
+    message,
+    type
+  };
+  
+  // Автоматически скрываем уведомление через 5 секунд
+  setTimeout(() => {
+    notification.value.show = false;
+  }, 5000);
+};
 
 // Обработчик выбора даты
 const handleDateSelected = (date) => {
@@ -69,9 +109,35 @@ const handleDateSelected = (date) => {
 };
 
 // Обработчик подтверждения даты
-const handleDateConfirmed = (date) => {
-  confirmedDate.value = date;
-  emit('dateConfirmed', date);
+const handleDateConfirmed = (date, eventLink = null, errorMessage = null) => {
+  if (errorMessage) {
+    // Если есть сообщение об ошибке - показываем уведомление об ошибке
+    showNotification(`Не удалось добавить событие в календарь: ${errorMessage}`, 'error');
+    return;
+  }
+  
+  // Показываем уведомление об успехе
+  showNotification('Тренировка успешно запланирована!');
+  
+  // Сообщаем родительскому компоненту о подтверждении даты
+  emit('dateConfirmed', date, eventLink);
+  
+  // Закрываем поп-ап через некоторое время после успешной записи
+  setTimeout(() => {
+    closePopup();
+  }, 1000); // Закрываем через 1 секунду
+};
+
+// Функция для обработки отладочных логов
+const handleDebugLog = (logData) => {
+  // Проверяем, есть ли родитель для передачи логов выше
+  if (typeof emit === 'function') {
+    emit('debug-log', logData);
+  } else {
+    // Если нет возможности передать выше, просто логируем в консоль
+    const prefix = logData.type === 'error' ? '[ERROR]' : '[INFO]';
+    console.log(`${prefix} ${logData.message}`);
+  }
 };
 
 // Функция для форматирования даты
@@ -180,41 +246,6 @@ window.addEventListener('beforeunload', (e) => {
   margin-top: 10px;
 }
 
-.confirmed-date {
-  margin-top: 16px;
-  padding: 16px;
-  background-color: rgba(36, 129, 204, 0.08);
-  border-radius: 16px;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  width: 100%;
-  animation: slideUp 0.4s ease;
-}
-
-.confirmation-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  background-color: #4CAF50;
-  color: white;
-  flex-shrink: 0;
-}
-
-.confirmation-text {
-  flex-grow: 1;
-}
-
-.confirmation-text p {
-  margin: 0;
-  font-size: 15px;
-  line-height: 1.5;
-  color: var(--tg-theme-text-color, #333333);
-}
-
 .popup-enter-active,
 .popup-leave-active {
   transition: opacity 0.3s ease;
@@ -262,18 +293,75 @@ window.addEventListener('beforeunload', (e) => {
   .popup-header h2 {
     font-size: 20px;
   }
-  
-  .confirmed-date {
-    padding: 12px;
+}
+
+/* Стили для индикатора загрузки */
+.loading-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 20px 0;
+}
+
+.spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(0, 0, 0, 0.1);
+  border-top-color: var(--tg-theme-button-color, #2481cc);
+  border-radius: 50%;
+  animation: spinner 1s linear infinite;
+}
+
+.loading-indicator p {
+  margin-top: 12px;
+  color: var(--tg-theme-hint-color, #999999);
+}
+
+@keyframes spinner {
+  to {
+    transform: rotate(360deg);
   }
-  
-  .confirmation-icon {
-    width: 40px;
-    height: 40px;
-  }
-  
-  .confirmation-text p {
-    font-size: 14px;
-  }
+}
+
+/* Стили для уведомления */
+.notification {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #4CAF50;
+  color: white;
+  padding: 12px 20px;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 10001;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 250px;
+  max-width: 90%;
+  animation: slideUp 0.3s ease;
+}
+
+.notification.error {
+  background-color: #F44336;
+}
+
+.notification p {
+  margin: 0;
+  flex-grow: 1;
+}
+
+.notification-close {
+  background: transparent;
+  border: none;
+  color: white;
+  margin-left: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
 }
 </style> 

@@ -13,7 +13,10 @@
     "start": "node .output/server/index.mjs"
   },
   "dependencies": {
+    "@popperjs/core": "^2.11.8",
     "axios": "^1.6.2",
+    "dotenv": "^16.4.7",
+    "googleapis": "^148.0.0",
     "nuxt": "^3.16.2",
     "v-calendar": "^3.1.2",
     "vue": "^3.5.13",

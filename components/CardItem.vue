@@ -2,12 +2,12 @@
   <div class="card-wrapper">
     <div class="card-item" @click="showPopup">
       <div class="card-image" :style="{ backgroundImage: `url(${image})` }">
-        <div v-if="!imageExists" class="card-placeholder">{{ title.charAt(0) }}</div>
+        <div v-if="!imageExists" class="card-placeholder" :style="{ backgroundColor: color + '30' }">{{ title.charAt(0) }}</div>
       </div>
       <div class="card-content">
         <h3 class="card-title">{{ title }}</h3>
         <p class="card-description">{{ description }}</p>
-        <div v-if="selectedDate" class="card-date">
+        <div v-if="selectedDate" class="card-date" :style="{ backgroundColor: color + '20', color: color }">
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
             <line x1="16" y1="2" x2="16" y2="6"></line>
@@ -23,8 +23,10 @@
         :is-visible="isPopupVisible"
         :title="title"
         :show-date-picker="true"
+        :color="color"
         @close="closePopup"
         @dateConfirmed="handleDateConfirmed"
+        @debug-log="handleDebugLog"
       />
     </Teleport>
   </div>
@@ -46,10 +48,14 @@ const props = defineProps({
   image: {
     type: String,
     default: ''
+  },
+  color: {
+    type: String,
+    default: '#4caf50' // Зеленый по умолчанию
   }
 });
 
-const emit = defineEmits(['dateSelected']);
+const emit = defineEmits(['dateSelected', 'debug-log']);
 const imageExists = ref(false);
 const isPopupVisible = ref(false);
 const selectedDate = ref(null);
@@ -66,12 +72,19 @@ onMounted(() => {
 });
 
 // Обработчик подтверждения даты
-const handleDateConfirmed = (date) => {
-  selectedDate.value = date;
-  emit('dateSelected', { 
-    title: props.title, 
-    date: date 
+const handleDateConfirmed = (event) => {
+  closePopup();
+  emit('dateSelected', {
+    title: props.title,
+    date: event.date,
+    color: props.color
   });
+};
+
+// Функция для обработки отладочных логов
+const handleDebugLog = (logData) => {
+  // Передаем лог наверх
+  emit('debug-log', logData);
 };
 
 // Функция для форматирования даты
