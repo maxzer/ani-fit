@@ -50,13 +50,13 @@ body {
 
 /* Links */
 a {
-  color: var(--tg-theme-link-color);
+  color: var(--tg-theme-link-color, #2481cc);
   text-decoration: none;
-  transition: var(--theme-transition);
+  transition: all 0.2s ease;
 }
 
-a:hover {
-  text-decoration: underline;
+a:active {
+  color: var(--tg-theme-link-color-rgb, rgba(36, 129, 204, 0.8));
 }
 
 /* Buttons */
@@ -69,12 +69,12 @@ button,
   padding: 10px 16px;
   font-size: 16px;
   cursor: pointer;
-  transition: var(--theme-transition);
+  transition: all 0.2s ease;
 }
 
-button:hover,
-.button:hover {
-  opacity: 0.9;
+button:active,
+.button:active {
+  transform: scale(0.98);
 }
 
 /* Containers */
@@ -97,4 +97,228 @@ h1, h2, h3, h4, h5, h6 {
 .secondary-text {
   color: var(--tg-theme-hint-color);
   transition: var(--theme-transition);
+}
+
+/* Глобальные стили темы */
+
+/* Стили для v-calendar */
+.vc-container {
+  --vc-accent-50: rgba(36, 129, 204, 0.05);
+  --vc-accent-100: rgba(36, 129, 204, 0.1);
+  --vc-accent-200: rgba(36, 129, 204, 0.2);
+  --vc-accent-300: rgba(36, 129, 204, 0.3);
+  --vc-accent-400: rgba(36, 129, 204, 0.4);
+  --vc-accent-500: rgba(36, 129, 204, 0.5);
+  --vc-accent-600: rgba(36, 129, 204, 0.6);
+  --vc-accent-700: rgba(36, 129, 204, 0.7);
+  --vc-accent-800: rgba(36, 129, 204, 0.8);
+  --vc-accent-900: rgba(36, 129, 204, 0.9);
+  
+  /* Адаптивные цвета для темной/светлой темы */
+  --vc-text-dark: var(--tg-theme-text-color, #333333);
+  --vc-text-light: var(--tg-theme-button-text-color, #ffffff);
+  --vc-background: var(--tg-theme-bg-color, #ffffff);
+  --vc-background-dark: var(--tg-theme-secondary-bg-color, #f0f0f0);
+  
+  border-radius: 16px !important;
+  border: none !important;
+  overflow: hidden !important;
+  background-color: var(--vc-background) !important;
+  color: var(--vc-text-dark) !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
+}
+
+/* Настройка размеров календаря */
+.vc-pane-container {
+  width: 100% !important;
+  padding-top: 10px !important;
+}
+
+.vc-weeks {
+  width: 100% !important;
+}
+
+/* Настройка стилей для дат */
+.vc-day {
+  color: var(--vc-text-dark) !important;
+  font-weight: 500 !important;
+  min-height: 44px !important;
+  transition: all 0.15s ease !important;
+}
+
+/* Стиль для выбранной даты */
+.vc-day.vc-day-selected .vc-highlights .vc-highlight-content {
+  background-color: var(--tg-theme-button-color, #2481cc) !important;
+  color: var(--tg-theme-button-text-color, #ffffff) !important;
+  font-weight: bold !important;
+  border-radius: 12px !important;
+}
+
+/* Стиль для сегодняшней даты */
+.vc-day.vc-day-today .vc-highlights .vc-highlight-content-light {
+  background-color: rgba(36, 129, 204, 0.15) !important;
+  color: var(--tg-theme-link-color, #2481cc) !important;
+  font-weight: bold !important;
+  border-radius: 12px !important;
+}
+
+/* Стили для заголовка календаря */
+.vc-header {
+  color: var(--vc-text-dark) !important;
+  background-color: var(--vc-background) !important;
+  font-weight: 600 !important;
+  padding: 8px 0 20px 0 !important;
+  border-bottom: none !important;
+  margin-bottom: 8px !important;
+  width: 100% !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+}
+
+.vc-title-wrapper {
+  background-color: transparent !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  width: auto !important;
+  min-width: 170px !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  margin: 0 auto !important;
+}
+
+.vc-title {
+  font-weight: 600 !important;
+  font-size: 16px !important;
+  color: var(--tg-theme-text-color, #333333) !important;
+  width: auto !important;
+  text-align: center !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* Стили для дней недели */
+.vc-weekday {
+  color: var(--tg-theme-hint-color, #999999) !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  text-transform: uppercase !important;
+  padding: 8px 0 !important;
+}
+
+/* Стили для стрелок навигации */
+.vc-arrow {
+  color: var(--tg-theme-text-color, #333333) !important;
+  width: 36px !important;
+  height: 36px !important;
+  border-radius: 50% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: all 0.2s ease !important;
+  background-color: #f5f5f5 !important;
+  margin: 0 8px !important;
+  flex-shrink: 0 !important;
+}
+
+.vc-arrow:active {
+  background-color: rgba(0, 0, 0, 0.05) !important;
+}
+
+.vc-arrow.is-left {
+  margin-right: auto !important;
+}
+
+.vc-arrow.is-right {
+  margin-left: auto !important;
+}
+
+/* Стили для неактивных дат */
+.vc-day.is-not-in-month {
+  opacity: 0.3 !important;
+}
+
+/* Стили для темного режима */
+[data-theme="dark"] .vc-container {
+  --vc-text-dark: var(--tg-theme-text-color, #e0e0e0);
+  --vc-text-light: var(--tg-theme-button-text-color, #ffffff);
+  --vc-background: var(--tg-theme-bg-color, #1e1e1e);
+  --vc-background-dark: var(--tg-theme-secondary-bg-color, #2c2c2c);
+}
+
+[data-theme="dark"] .vc-day:active {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+[data-theme="dark"] .vc-arrow:active {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.vc-pane-layout {
+  width: 100% !important;
+}
+
+.vc-pane-header {
+  width: 100% !important;
+  padding: 0 8px !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  position: relative !important;
+}
+
+.vc-month-box {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  width: 100% !important;
+}
+
+/* Стили для выбора времени */
+.vc-time-picker {
+  border-top: 1px solid rgba(0, 0, 0, 0.1) !important;
+  padding: 16px !important;
+  margin-top: 15px !important;
+  background-color: var(--tg-theme-bg-color, #ffffff) !important;
+}
+
+.vc-time-picker-title {
+  color: var(--tg-theme-text-color, #333333) !important;
+  font-weight: 600 !important;
+  margin-bottom: 12px !important;
+  font-size: 15px !important;
+}
+
+.vc-time-select {
+  align-items: center !important;
+  justify-content: center !important;
+  display: flex !important;
+}
+
+.vc-time-select select {
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  border-radius: 8px !important;
+  padding: 8px 10px !important;
+  background-color: var(--tg-theme-bg-color, #ffffff) !important;
+  color: var(--tg-theme-text-color, #333333) !important;
+  font-size: 16px !important;
+  margin: 0 5px !important;
+}
+
+/* Стили для темного режима селектора времени */
+[data-theme="dark"] .vc-time-picker {
+  background-color: var(--tg-theme-bg-color, #1e1e1e) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+[data-theme="dark"] .vc-time-select select {
+  background-color: var(--tg-theme-bg-color, #1e1e1e) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  color: var(--tg-theme-text-color, #e0e0e0) !important;
+}
+
+/* Стили для селектора AM/PM, скрываем его для 24-часового формата */
+.vc-time-select .vc-select.vc-am-pm {
+  display: none !important;
 } 

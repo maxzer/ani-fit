@@ -410,21 +410,24 @@ const toggleDebugInfo = () => {
   position: fixed;
   bottom: 20px;
   right: 20px;
-  padding: 8px 16px;
-  background-color: var(--tg-theme-button-color, #3390ec);
-  color: var(--tg-theme-button-text-color, #ffffff);
-  border: none;
-  border-radius: 8px;
+  background-color: rgba(255, 255, 255, 0.7);
+  color: #333;
+  border: 1px solid #ccc;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
-  font-size: 14px;
-  z-index: 1000;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-  transition: all 0.3s ease;
+  z-index: 9999;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
 }
 
-.debug-toggle:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+.debug-toggle:active {
+  transform: scale(0.95);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .test-mode-notice {

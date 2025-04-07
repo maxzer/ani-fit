@@ -7,15 +7,24 @@
       <div class="card-content">
         <h3 class="card-title">{{ title }}</h3>
         <p class="card-description">{{ description }}</p>
+        <div v-if="selectedDate" class="card-date">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
+          <span>{{ formatDate(selectedDate) }}</span>
+        </div>
       </div>
     </div>
     <Teleport to="body">
       <CardPopup
         :is-visible="isPopupVisible"
         :title="title"
-        :description="description"
-        :image="image"
+        :show-date-picker="true"
         @close="closePopup"
+        @dateConfirmed="handleDateConfirmed"
       />
     </Teleport>
   </div>
@@ -40,8 +49,10 @@ const props = defineProps({
   }
 });
 
+const emit = defineEmits(['dateSelected']);
 const imageExists = ref(false);
 const isPopupVisible = ref(false);
+const selectedDate = ref(null);
 
 // Проверка существования изображения
 onMounted(() => {
@@ -53,6 +64,26 @@ onMounted(() => {
     img.src = props.image;
   }
 });
+
+// Обработчик подтверждения даты
+const handleDateConfirmed = (date) => {
+  selectedDate.value = date;
+  emit('dateSelected', { 
+    title: props.title, 
+    date: date 
+  });
+};
+
+// Функция для форматирования даты
+const formatDate = (date) => {
+  if (!date) return '';
+  const d = new Date(date);
+  return d.toLocaleDateString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  });
+};
 
 const showPopup = () => {
   isPopupVisible.value = true;
@@ -148,5 +179,21 @@ const closePopup = () => {
   color: var(--tg-theme-hint-color, #666666);
   line-height: 1.5;
   font-weight: 500;
+}
+
+.card-date {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 6px 10px;
+  background-color: rgba(36, 129, 204, 0.1);
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--tg-theme-link-color, #2481cc);
+}
+
+.card-date svg {
+  color: var(--tg-theme-link-color, #2481cc);
 }
 </style> 

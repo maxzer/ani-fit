@@ -13,7 +13,29 @@
         :title="card.title"
         :description="card.description"
         :image="card.image"
+        @date-selected="handleDateSelected"
       />
+    </div>
+    
+    <!-- Запланированные события -->
+    <div v-if="scheduledEvents.length > 0" class="scheduled-events">
+      <div class="section-title">Запланированные события</div>
+      <div class="events-list">
+        <div v-for="(event, index) in scheduledEvents" :key="index" class="event-item">
+          <div class="event-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+              <line x1="16" y1="2" x2="16" y2="6"></line>
+              <line x1="8" y1="2" x2="8" y2="6"></line>
+              <line x1="3" y1="10" x2="21" y2="10"></line>
+            </svg>
+          </div>
+          <div class="event-info">
+            <div class="event-title">{{ event.title }}</div>
+            <div class="event-date">{{ formatDate(event.date) }}</div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -61,6 +83,46 @@ const cards = ref([
   }
 ]);
 
+// Массив для хранения запланированных событий
+const scheduledEvents = ref([]);
+
+// Обработчик выбора даты
+const handleDateSelected = (eventData) => {
+  // Добавляем новое событие в список
+  scheduledEvents.value.push({
+    title: eventData.title,
+    date: eventData.date
+  });
+  
+  // Сортируем события по дате (от ближайшей к более поздней)
+  scheduledEvents.value.sort((a, b) => new Date(a.date) - new Date(b.date));
+  
+  // Если используем Telegram WebApp, показываем нотификацию
+  if (isTelegramWebAppAvailable) {
+    const telegram = window.Telegram.WebApp;
+    telegram.showPopup({
+      title: "Событие запланировано",
+      message: `Вы запланировали: ${eventData.title} на ${formatDate(eventData.date)}`,
+      buttons: [{ type: "ok" }]
+    });
+  }
+};
+
+// Функция для форматирования даты
+const formatDate = (date) => {
+  if (!date) return '';
+  const d = new Date(date);
+  return `${d.toLocaleDateString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  })} ${d.toLocaleTimeString('ru-RU', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  })}`;
+};
+
 // Инициализация приложения
 onMounted(() => {
   console.log('Инициализация главной страницы...');
@@ -92,52 +154,55 @@ onMounted(() => {
   margin-bottom: 24px;
 }
 
-.card-item {
+.scheduled-events {
+  margin-top: 24px;
+  background-color: rgba(255, 255, 255, 0.06);
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.events-list {
   display: flex;
   flex-direction: column;
-  border-radius: 12px;
-  overflow: hidden;
-  background-color: var(--card-bg-color, #ffffff);
-  box-shadow: var(--card-shadow, 0 2px 8px rgba(0, 0, 0, 0.1));
-  height: 100%;
-  transition: transform 0.2s, box-shadow 0.2s;
-  cursor: pointer;
+  gap: 10px;
 }
 
-.card-item:hover, .card-item:active {
-  transform: translateY(-4px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-}
-
-.card-image {
-  height: 120px;
+.event-item {
   display: flex;
-  justify-content: center;
   align-items: center;
-}
-
-.card-icon {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.card-content {
   padding: 12px;
-  text-align: center;
+  background-color: var(--tg-theme-bg-color, #ffffff);
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
 }
 
-.card-title {
-  margin: 0;
-  font-size: 16px;
+.event-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background-color: rgba(36, 129, 204, 0.1);
+  border-radius: 50%;
+  margin-right: 12px;
+  color: var(--tg-theme-link-color, #2481cc);
+}
+
+.event-info {
+  flex: 1;
+}
+
+.event-title {
   font-weight: 600;
-  color: var(--card-text-color, #333333);
+  color: var(--tg-theme-text-color, #333333);
+  font-size: 16px;
 }
 
-.card-description {
-  margin: 4px 0 0;
-  font-size: 12px;
+.event-date {
   color: var(--tg-theme-hint-color, #666666);
+  font-size: 14px;
+  margin-top: 4px;
 }
 
 .app-footer {
