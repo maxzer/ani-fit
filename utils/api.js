@@ -35,7 +35,6 @@ export const getApiUrl = (endpoint) => {
 export const fetchApi = async (endpoint, options = {}) => {
   try {
     const url = getApiUrl(endpoint);
-    console.log(`Отправка запроса на: ${url}`);
     
     const response = await fetch(url, {
       headers: {
@@ -47,14 +46,12 @@ export const fetchApi = async (endpoint, options = {}) => {
     
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('API ошибка:', errorText);
       throw new Error(`API ошибка: ${response.status} ${response.statusText}`);
     }
     
     const data = await response.json();
     return data;
   } catch (error) {
-    console.error('Ошибка API запроса:', error);
     throw error;
   }
 }; 

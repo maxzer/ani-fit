@@ -78,10 +78,8 @@ export function sendDataToTelegram(data) {
   const webApp = getTelegramWebApp();
   if (webApp) {
     webApp.sendData(JSON.stringify(data));
-    console.log('Данные отправлены в Telegram:', data);
     return true;
   }
-  console.error('Не удалось отправить данные: WebApp не доступен');
   return false;
 }
 
@@ -173,7 +171,6 @@ export const TelegramStorage = {
       const webApp = getTelegramWebApp();
       
       if (!webApp) {
-        console.error('Telegram WebApp недоступен');
         return null;
       }
       
@@ -195,37 +192,33 @@ export const TelegramStorage = {
       
       return null;
     } catch (error) {
-      console.error('Ошибка при получении данных из хранилища Telegram:', error);
       return null;
     }
   },
 
-  // Сохранение элемента в хранилище
+  // Запись элемента в хранилище
   setItem: async (key, value) => {
     try {
       const webApp = getTelegramWebApp();
       
       if (!webApp) {
-        console.error('Telegram WebApp недоступен');
         return false;
       }
       
-      // CloudStorage API (новая версия)
+      // Проверяем наличие CloudStorage API (новая версия)
       if (webApp.CloudStorage) {
-        await webApp.CloudStorage.setItem(key, value);
+        await webApp.CloudStorage.setItem(key, String(value));
         return true;
       }
       
-      // WebAppDataImpl API (устаревший API)
+      // Используем WebAppDataImpl API если доступен (устаревший API)
       if (webApp.WebAppDataImpl) {
-        await webApp.WebAppDataImpl.setValue(key, value);
+        await webApp.WebAppDataImpl.setValue(key, String(value));
         return true;
       }
       
-      console.error('В Telegram WebApp нет доступных API для хранения данных');
       return false;
     } catch (error) {
-      console.error('Ошибка при сохранении данных в хранилище Telegram:', error);
       return false;
     }
   },
@@ -236,108 +229,57 @@ export const TelegramStorage = {
       const webApp = getTelegramWebApp();
       
       if (!webApp) {
-        console.error('Telegram WebApp недоступен');
         return false;
       }
       
-      // CloudStorage API (новая версия)
+      // Проверяем наличие CloudStorage API (новая версия)
       if (webApp.CloudStorage) {
         await webApp.CloudStorage.removeItem(key);
         return true;
       }
       
-      // WebAppDataImpl API (устаревший API)
+      // Используем WebAppDataImpl API если доступен (устаревший API)
       if (webApp.WebAppDataImpl) {
-        // В старом API нет прямого метода удаления, используем setValue с пустой строкой
-        await webApp.WebAppDataImpl.setValue(key, '');
+        await webApp.WebAppDataImpl.removeValue(key);
         return true;
       }
       
-      console.error('В Telegram WebApp нет доступных API для удаления данных');
       return false;
     } catch (error) {
-      console.error('Ошибка при удалении данных из хранилища Telegram:', error);
       return false;
     }
   }
 };
 
+/**
+ * Получить данные инициализации из WebApp
+ * @returns {object|null} Данные или null если недоступны
+ */
 export const getInitData = async () => {
-  if (typeof window !== 'undefined' && window.Telegram && window.Telegram.WebApp) {
-    try {
-      const webApp = window.Telegram.WebApp;
-      
-      // Ручная проверка возможных проблем
-      if (webApp.isExpanded === false) {
-        webApp.expand(); // Пробуем развернуть
-      }
-      
-      // Проверяем наличие initDataUnsafe
-      if (webApp.initDataUnsafe) {
-        return webApp.initDataUnsafe;
-      }
-      
-      // Проверяем наличие initData
-      if (webApp.initData) {
-        // Проверяем, не пустая ли строка
-        if (webApp.initData.trim() === '') {
-          return null;
-        }
-        
-        // Парсим initData
-        try {
-          const params = new URLSearchParams(webApp.initData);
-          const result = {};
-          
-          // Проверяем, есть ли параметры
-          if (params.toString() === webApp.initData) {
-            return { raw: webApp.initData };
-          }
-          
-          // Обрабатываем параметры
-          let paramCount = 0;
-          for (const [key, value] of params.entries()) {
-            paramCount++;
-            try {
-              result[key] = JSON.parse(value);
-            } catch (e) {
-              result[key] = value;
-            }
-          }
-          
-          if (paramCount === 0) {
-            return null;
-          }
-          
-          return result;
-        } catch (parseError) {
-          // Если не удалось распарсить как URLSearchParams, проверяем формат JSON
-          try {
-            return JSON.parse(webApp.initData);
-          } catch (jsonError) {
-            // Если не JSON, возвращаем как строку
-            return { raw: webApp.initData };
-          }
-        }
-      }
-      
-      // Проверка альтернативных источников данных
-      if (webApp.CloudStorage) {
-        try {
-          const userData = await webApp.CloudStorage.getItem('user_data');
-          if (userData?.value) {
-            return JSON.parse(userData.value);
-          }
-        } catch (e) {
-          console.error('Ошибка при получении данных из CloudStorage:', e);
-        }
-      }
-      
-      return null;
-    } catch (error) {
-      console.error('Ошибка при получении initData:', error);
+  try {
+    const webApp = getTelegramWebApp();
+    if (!webApp) return null;
+    
+    // Проверка на наличие данных
+    if (!webApp.initData && !webApp.initDataUnsafe) {
       return null;
     }
+    
+    // Получаем данные пользователя
+    const user = getTelegramUser();
+    
+    if (!user) {
+      return null;
+    }
+    
+    // Формируем результат
+    return {
+      user,
+      authDate: webApp.initDataUnsafe?.auth_date || null,
+      hash: webApp.initDataUnsafe?.hash || null,
+      startParam: webApp.initDataUnsafe?.start_param || null
+    };
+  } catch (error) {
+    return null;
   }
-  return null;
 }; 

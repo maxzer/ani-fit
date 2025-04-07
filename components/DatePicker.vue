@@ -1,14 +1,5 @@
 <template>
   <div class="date-picker-container">
-    <!-- Отладочная информация -->
-    <div class="debug-info-panel">
-      <div class="debug-status">Отладка: {{ requestStatus }}</div>
-      <div v-if="lastError" class="debug-error">
-        <div class="error-title">Ошибка:</div>
-        <div class="error-message">{{ lastError }}</div>
-      </div>
-    </div>
-
     <VDatePicker
       v-model="selectedDate"
       :masks="masks"
@@ -160,7 +151,6 @@ const updateDateWithTime = () => {
   try {
     const date = new Date(selectedDate.value);
     if (isNaN(date.getTime())) {
-      console.error('Невалидная дата:', selectedDate.value);
       return;
     }
     
@@ -169,7 +159,7 @@ const updateDateWithTime = () => {
     date.setSeconds(0);
     selectedDate.value = date;
   } catch (error) {
-    console.error('Ошибка при обновлении даты:', error);
+    // Ошибка при обновлении даты
   }
 };
 
@@ -220,7 +210,6 @@ onMounted(() => {
     
     // Проверяем, что дата валидна
     if (isNaN(today.getTime())) {
-      console.error('Невалидная текущая дата при инициализации');
       // Используем запасной вариант с текущей датой через new Date()
       selectedDate.value = new Date();
     } else {
@@ -257,7 +246,6 @@ onMounted(() => {
       isDarkTheme.value = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
     }
   } catch (error) {
-    console.error('Ошибка при инициализации DatePicker:', error);
     // В случае ошибки устанавливаем безопасные значения по умолчанию
     selectedDate.value = new Date();
     calendarMode.value = 'datetime';
@@ -314,13 +302,12 @@ const dateSelected = (date) => {
     // Проверяем, что дата валидна
     const checkDate = new Date(date);
     if (isNaN(checkDate.getTime())) {
-      console.error('Невалидная дата передана в dateSelected:', date);
       return;
     }
     
     emit('dateSelected', date);
   } catch (error) {
-    console.error('Ошибка в обработчике dateSelected:', error);
+    // Ошибка в обработчике
   }
 };
 

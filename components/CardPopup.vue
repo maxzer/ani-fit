@@ -133,10 +133,6 @@ const handleDebugLog = (logData) => {
   // Проверяем, есть ли родитель для передачи логов выше
   if (typeof emit === 'function') {
     emit('debug-log', logData);
-  } else {
-    // Если нет возможности передать выше, просто логируем в консоль
-    const prefix = logData.type === 'error' ? '[ERROR]' : '[INFO]';
-    console.log(`${prefix} ${logData.message}`);
   }
 };
 
@@ -156,7 +152,6 @@ const formatDate = (date) => {
 };
 
 const closePopup = () => {
-  console.log('Popup close event emitted');
   emit('close');
 };
 

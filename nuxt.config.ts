@@ -4,16 +4,6 @@ export default defineNuxtConfig({
   compatibilityDate: "2025-04-07",
   
   // В Nuxt 3 переменные окружения загружаются автоматически
-  // Явное использование dotenv для дебаггинга
-  hooks: {
-    'ready': (nuxt) => {
-      console.log('Loaded environment variables:')
-      console.log('GOOGLE_CLIENT_EMAIL exists:', !!process.env.GOOGLE_CLIENT_EMAIL)
-      console.log('GOOGLE_PRIVATE_KEY exists:', !!process.env.GOOGLE_PRIVATE_KEY)
-      console.log('GOOGLE_CALENDAR_ID exists:', !!process.env.GOOGLE_CALENDAR_ID)
-    }
-  },
-
   app: {
     head: {
       script: [
@@ -25,7 +15,12 @@ export default defineNuxtConfig({
       ],
       meta: [
         { name: 'format-detection', content: 'telephone=no' },
-        { name: 'referrer', content: 'no-referrer-when-downgrade' }
+        { name: 'referrer', content: 'no-referrer-when-downgrade' },
+        { name: 'viewport', content: 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no' },
+        { name: 'mobile-web-app-capable', content: 'yes' },
+        { name: 'apple-mobile-web-app-capable', content: 'yes' },
+        { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' },
+        { name: 'theme-color', content: '#ffffff' }
       ]
     }
   },

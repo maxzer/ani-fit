@@ -4,27 +4,31 @@ export default defineNuxtPlugin((nuxtApp) => {
   // Выполняем только в браузере
   if (typeof window === 'undefined') return;
   
-  console.log('Инициализация Telegram WebApp плагина');
-  
   // Проверяем наличие Telegram WebApp API
   if (window.Telegram && window.Telegram.WebApp) {
-    console.log('Telegram WebApp API доступен');
-    
     try {
       // Инициализируем Telegram WebApp
       const webApp = window.Telegram.WebApp;
       
       // Расширяем API для работы с WebApp
       webApp.ready();
+      
+      // Гарантированно раскрываем на полный экран
       webApp.expand();
+      
+      // Дополнительные вызовы expand с задержкой для гарантии полноэкранного режима
+      setTimeout(() => webApp.expand(), 300);
+      setTimeout(() => webApp.expand(), 1000);
       
       // Отключаем сообщение о выходе из приложения
       webApp.enableClosingConfirmation();
       
-      // Устанавливаем фон
-      if (webApp.platform) {
-        console.log('Платформа Telegram:', webApp.platform);
-      }
+      // Следим за изменением размера контейнера и снова вызываем expand при необходимости
+      webApp.onEvent('viewportChanged', () => {
+        if (!webApp.isExpanded) {
+          webApp.expand();
+        }
+      });
       
       // Адаптируем под тему Telegram
       const colorScheme = webApp.colorScheme || 'light';
@@ -36,33 +40,21 @@ export default defineNuxtPlugin((nuxtApp) => {
         document.documentElement.setAttribute('data-theme', newColorScheme);
       });
       
-      // Добавляем обработчик сетевых ошибок для отладки
+      // Добавляем обработчик сетевых ошибок
       const originalFetch = window.fetch;
       window.fetch = async function(...args) {
         try {
           const response = await originalFetch.apply(this, args);
-          
-          // Логируем успешные запросы
-          if (args[0] && args[0].includes && args[0].includes('/api/')) {
-            console.log(`[TG WebApp] Fetch request success: ${args[0]}`);
-          }
-          
           return response;
         } catch (error) {
-          // Логируем ошибки сети
-          console.error(`[TG WebApp] Fetch error for ${args[0]}:`, error);
           throw error;
         }
       };
       
       // Экспортируем webApp в глобальный объект для доступа из компонентов
       nuxtApp.provide('telegram', webApp);
-      
-      console.log('Telegram WebApp успешно инициализирован');
     } catch (error) {
-      console.error('Ошибка инициализации Telegram WebApp:', error);
+      // Ошибка инициализации
     }
-  } else {
-    console.log('Telegram WebApp API не доступен. Запущено в обычном браузере.');
   }
 }); 
