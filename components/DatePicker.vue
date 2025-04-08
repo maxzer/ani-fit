@@ -357,21 +357,23 @@ const confirmDate = async () => {
     
     sendDebugLog(`Подтверждение даты: ${selectedDate.value} ${selectedTimeSlot.value}`);
     
+    // Создаем новую дату с выбранным временем
+    const date = new Date(selectedDate.value);
+    date.setHours(selectedHour.value);
+    date.setMinutes(selectedMinute.value);
+    date.setSeconds(0);
+    date.setMilliseconds(0);
+    
     // Собираем данные о событии
     const summary = `${props.organizerName} - ${props.serviceName}`;
     const description = `Запись на ${props.serviceName}`;
     
-    // Вычисляем дату и время начала события
-    const startDateTime = new Date(selectedDate.value);
-    startDateTime.setHours(selectedHour.value);
-    startDateTime.setMinutes(selectedMinute.value);
-    
     // Вычисляем дату и время окончания события (добавляем продолжительность)
-    const endDateTime = new Date(startDateTime);
+    const endDateTime = new Date(date);
     endDateTime.setMinutes(endDateTime.getMinutes() + props.serviceDuration);
     
     // Форматируем даты в ISO формат для Google Calendar API
-    const startDateTimeISO = startDateTime.toISOString();
+    const startDateTimeISO = date.toISOString();
     const endDateTimeISO = endDateTime.toISOString();
     
     sendDebugLog(`Начало события: ${startDateTimeISO}`);
@@ -390,7 +392,7 @@ const confirmDate = async () => {
       location: props.organizerLocation,
       attendees: [props.userEmail].filter(Boolean),
       requestId: currentRequestId,
-      color: props.color // Используем цвет из пропсов
+      color: props.color
     };
     
     sendDebugLog(`Отправка данных события: ${JSON.stringify(eventData).substring(0, 100)}...`);
@@ -643,15 +645,27 @@ const confirmDate = async () => {
     if (response.success) {
       sendDebugLog('Событие успешно создано!');
       isSubmitted.value = true;
-      // Сообщаем родительскому компоненту об успешном подтверждении
-      emit('confirmed', selectedDate.value, response.eventLink);
+      // Сообщаем родительскому компоненту об успешном подтверждении с правильной датой
+      emit('confirmed', { 
+        date: startDateTimeISO,
+        title: props.serviceName,
+        color: props.color
+      });
     } else {
       sendDebugLog(`Ошибка при создании события: ${response.error}`, 'error');
-      emit('confirmed', selectedDate.value, null, response.error || 'Ошибка при создании события');
+      emit('confirmed', { 
+        date: startDateTimeISO,
+        title: props.serviceName,
+        color: props.color
+      }, null, response.error || 'Ошибка при создании события');
     }
   } catch (error) {
     sendDebugLog(`Ошибка при подтверждении даты: ${error.stack || error.message}`, 'error');
-    emit('confirmed', selectedDate.value, null, error.message || 'Ошибка при подтверждении даты');
+    emit('confirmed', { 
+      date: new Date(selectedDate.value).toISOString(),
+      title: props.serviceName,
+      color: props.color
+    }, null, error.message || 'Ошибка при подтверждении даты');
   } finally {
     isLoading.value = false;
   }
@@ -1071,5 +1085,10 @@ const confirmDate = async () => {
 .error-message {
   color: #ff8a80;
   word-break: break-word;
+}
+
+/* Скрываем последний vc-week элемент */
+:deep(.vc-weeks .vc-week:last-child) {
+  display: none !important;
 }
 </style> 

@@ -34,7 +34,10 @@
           </div>
           <div class="event-info">
             <div class="event-title">{{ event.title }}</div>
-            <div class="event-date">{{ formatDate(event.date) }}</div>
+            <div class="event-datetime">
+              <div class="event-date">{{ formatDateOnly(event.date) }}</div>
+              <div class="event-time" :style="{ color: event.color }">{{ formatTimeOnly(event.date) }}</div>
+            </div>
           </div>
         </div>
       </div>
@@ -151,6 +154,28 @@ const formatDate = (date) => {
   })}`;
 };
 
+// Функция для форматирования только даты
+const formatDateOnly = (date) => {
+  if (!date) return '';
+  const d = new Date(date);
+  return d.toLocaleDateString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  });
+};
+
+// Функция для форматирования только времени
+const formatTimeOnly = (date) => {
+  if (!date) return '';
+  const d = new Date(date);
+  return d.toLocaleTimeString('ru-RU', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
+};
+
 // Функция для обработки отладочных логов (пустая функция для совместимости)
 const handleDebugLog = () => {};
 </script>
@@ -225,10 +250,27 @@ const handleDebugLog = () => {};
   font-size: 16px;
 }
 
+.event-datetime {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
 .event-date {
   color: var(--tg-theme-hint-color, #666666);
   font-size: 14px;
-  margin-top: 4px;
+  padding: 2px 8px;
+  background-color: rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+}
+
+.event-time {
+  font-size: 14px;
+  font-weight: 600;
+  padding: 2px 8px;
+  background-color: rgba(36, 129, 204, 0.1);
+  border-radius: 4px;
 }
 
 .app-footer {

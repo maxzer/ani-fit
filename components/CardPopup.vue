@@ -109,10 +109,15 @@ const handleDateSelected = (date) => {
 };
 
 // Обработчик подтверждения даты
-const handleDateConfirmed = (date, eventLink = null, errorMessage = null) => {
+const handleDateConfirmed = (dateObj, eventLink = null, errorMessage = null) => {
   if (errorMessage) {
     // Если есть сообщение об ошибке - показываем уведомление об ошибке
     showNotification(`Не удалось добавить событие в календарь: ${errorMessage}`, 'error');
+    return;
+  }
+  
+  if (!dateObj || !dateObj.date) {
+    console.error('Invalid date object received:', dateObj);
     return;
   }
   
@@ -120,12 +125,12 @@ const handleDateConfirmed = (date, eventLink = null, errorMessage = null) => {
   showNotification('Тренировка успешно запланирована!');
   
   // Сообщаем родительскому компоненту о подтверждении даты
-  emit('dateConfirmed', date, eventLink);
+  emit('dateConfirmed', dateObj);
   
   // Закрываем поп-ап через некоторое время после успешной записи
   setTimeout(() => {
     closePopup();
-  }, 1000); // Закрываем через 1 секунду
+  }, 1000);
 };
 
 // Функция для обработки отладочных логов

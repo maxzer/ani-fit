@@ -342,4 +342,9 @@ h1, h2, h3, h4, h5, h6 {
 /* Стили для селектора AM/PM, скрываем его для 24-часового формата */
 .vc-time-select .vc-select.vc-am-pm {
   display: none !important;
+}
+
+/* Скрываем последний vc-week элемент */
+.vc-weeks .vc-week:last-child {
+  display: none !important;
 } 

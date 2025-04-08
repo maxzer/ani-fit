@@ -1,10 +1,7 @@
 <template>
   <div class="app-container" :data-theme="theme?.colorScheme || 'light'">
     <div v-if="!isLoading && isTelegramWebAppAvailable && initData">
-      <header class="app-header">
-        <h1>Добро пожаловать в Ani-Fit</h1>
-        <div v-if="isTestMode" class="test-mode-badge">Тестовый режим</div>
-      </header>
+      <div v-if="isTestMode" class="test-mode-badge">Тестовый режим</div>
       <NuxtPage />
     </div>
     <div v-else-if="!isTelegramWebAppAvailable" class="loading-container">

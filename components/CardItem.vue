@@ -7,15 +7,6 @@
       <div class="card-content">
         <h3 class="card-title">{{ title }}</h3>
         <p class="card-description">{{ description }}</p>
-        <div v-if="selectedDate" class="card-date" :style="{ backgroundColor: color + '20', color: color }">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-            <line x1="16" y1="2" x2="16" y2="6"></line>
-            <line x1="8" y1="2" x2="8" y2="6"></line>
-            <line x1="3" y1="10" x2="21" y2="10"></line>
-          </svg>
-          <span>{{ formatDate(selectedDate) }}</span>
-        </div>
       </div>
     </div>
     <Teleport to="body">
@@ -74,6 +65,7 @@ onMounted(() => {
 // Обработчик подтверждения даты
 const handleDateConfirmed = (event) => {
   closePopup();
+  selectedDate.value = event.date;
   emit('dateSelected', {
     title: props.title,
     date: event.date,
@@ -91,11 +83,15 @@ const handleDebugLog = (logData) => {
 const formatDate = (date) => {
   if (!date) return '';
   const d = new Date(date);
-  return d.toLocaleDateString('ru-RU', {
+  return `${d.toLocaleDateString('ru-RU', {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric'
-  });
+  })} ${d.toLocaleTimeString('ru-RU', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  })}`;
 };
 
 const showPopup = () => {
@@ -194,19 +190,25 @@ const closePopup = () => {
   font-weight: 500;
 }
 
+.card-date-wrapper {
+  margin-top: auto;
+  padding-top: 12px;
+}
+
 .card-date {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-top: 12px;
-  padding: 6px 10px;
+  padding: 8px 12px;
   background-color: rgba(36, 129, 204, 0.1);
-  border-radius: 6px;
-  font-size: 13px;
+  border-radius: 8px;
+  font-size: 14px;
   color: var(--tg-theme-link-color, #2481cc);
+  width: fit-content;
 }
 
 .card-date svg {
-  color: var(--tg-theme-link-color, #2481cc);
+  flex-shrink: 0;
+  color: currentColor;
 }
 </style> 
