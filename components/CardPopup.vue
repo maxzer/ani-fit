@@ -12,6 +12,30 @@
           </button>
         </div>
         <div class="popup-body">
+          <!-- Строка с выбором специалиста и вводом породы -->
+          <div class="input-row">
+            <div class="input-col">
+              <StaffSelector 
+                v-if="showDatePicker"
+                :color="color"
+                @staffSelected="handleStaffSelected"
+                class="staff-selector-wrapper"
+              />
+            </div>
+            
+            <div class="input-col">
+              <div class="input-group breed-input-wrapper">
+                <input
+                  type="text"
+                  v-model="petBreed"
+                  placeholder="Введите породу"
+                  class="breed-input"
+                  :style="{ borderColor: color + '40' }"
+                />
+              </div>
+            </div>
+          </div>
+          
           <!-- Компонент календаря -->
           <DatePicker 
             v-if="showDatePicker" 
@@ -21,10 +45,12 @@
             class="full-width-calendar"
             :color="color"
             :serviceName="title"
-            :organizerName="'AniFit'"
+            :organizerName="staffInfo ? staffInfo.name : 'AniFit'"
             :serviceDuration="60"
             :organizerLocation="'AniFit Студия'"
             :userEmail="userEmail"
+            :staffInfo="staffInfo"
+            :petBreed="petBreed"
           />
           
           <!-- Индикатор загрузки -->
@@ -50,8 +76,9 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import DatePicker from './DatePicker.vue';
+import StaffSelector from './StaffSelector.vue';
 
 const props = defineProps({
   isVisible: {
@@ -82,6 +109,12 @@ const emit = defineEmits(['close', 'dateConfirmed', 'debug-log']);
 const selectedDate = ref(null);
 const isLoading = ref(false);
 
+// Состояние для выбранного сотрудника
+const staffInfo = ref(null);
+
+// Состояние для породы животного
+const petBreed = ref('');
+
 // Состояние для уведомлений
 const notification = ref({
   show: false,
@@ -103,6 +136,11 @@ const showNotification = (message, type = 'success') => {
   }, 5000);
 };
 
+// Обработчик выбора сотрудника
+const handleStaffSelected = (staff) => {
+  staffInfo.value = staff;
+};
+
 // Обработчик выбора даты
 const handleDateSelected = (date) => {
   selectedDate.value = date;
@@ -121,11 +159,21 @@ const handleDateConfirmed = (dateObj, eventLink = null, errorMessage = null) => 
     return;
   }
   
+  // Проверка, выбран ли сотрудник (усиленная проверка)
+  if (!staffInfo.value || !staffInfo.value.id) {
+    showNotification('Пожалуйста, выберите специалиста перед подтверждением', 'error');
+    return;
+  }
+  
   // Показываем уведомление об успехе
   showNotification('Тренировка успешно запланирована!');
   
   // Сообщаем родительскому компоненту о подтверждении даты
-  emit('dateConfirmed', dateObj);
+  emit('dateConfirmed', {
+    ...dateObj,
+    staffInfo: staffInfo.value,
+    petBreed: petBreed.value
+  });
   
   // Закрываем поп-ап через некоторое время после успешной записи
   setTimeout(() => {
@@ -157,6 +205,10 @@ const formatDate = (date) => {
 };
 
 const closePopup = () => {
+  // Сбрасываем все состояния при закрытии попапа
+  selectedDate.value = null;
+  staffInfo.value = null; // Сбрасываем информацию о специалисте
+  petBreed.value = ''; // Сбрасываем информацию о породе
   emit('close');
 };
 
@@ -164,6 +216,18 @@ window.addEventListener('beforeunload', (e) => {
   e.preventDefault();
   e.returnValue = '';
   return '';
+});
+
+// Отслеживаем открытие попапа
+watch(() => props.isVisible, (newValue) => {
+  if (newValue === true) {
+    // Если попап открывается, проверяем выбор специалиста
+    if (!staffInfo.value) {
+      // Если специалист не выбран, обнуляем остальные данные
+      selectedDate.value = null;
+      petBreed.value = '';
+    }
+  }
 });
 </script>
 
@@ -232,7 +296,7 @@ window.addEventListener('beforeunload', (e) => {
 
 .popup-body {
   color: var(--tg-theme-text-color, #333333);
-  line-height: 1.6;
+  line-height: 1.3;
   font-size: 16px;
   display: flex;
   flex-direction: column;
@@ -363,5 +427,53 @@ window.addEventListener('beforeunload', (e) => {
   align-items: center;
   justify-content: center;
   padding: 0;
+}
+
+.input-row {
+  display: flex;
+  width: 100%;
+  gap: 10px;
+}
+
+.input-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.staff-selector-wrapper, 
+.breed-input-wrapper {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.breed-input-wrapper {
+  margin-bottom: 0;
+  height: 56px;  /* Фиксированная высота как у селектора */
+}
+
+.breed-input {
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 2px solid var(--tg-theme-secondary-bg-color, #f0f0f0);
+  background-color: var(--tg-theme-bg-color, #ffffff);
+  color: var(--tg-theme-text-color, #333333);
+  font-size: 15px;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  outline: none;
+  box-sizing: border-box;
+  height: 56px; /* Такая же высота как у селектора */
+}
+
+.breed-input:focus {
+  border-color: v-bind('color');
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.1);
+}
+
+.breed-input::placeholder {
+  color: var(--tg-theme-hint-color, #999999);
 }
 </style> 

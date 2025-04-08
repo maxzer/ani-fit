@@ -17,6 +17,20 @@
       :is-popover-visible="false"
       />
     
+    <!-- Поле ввода породы (скрыто, так как уже есть в CardPopup) -->
+    <!-- <div class="breed-input-container" v-if="selectedDate && !props.petBreed">
+      <div class="breed-input-header">Укажите породу животного</div>
+      <div class="breed-input-wrapper">
+        <input 
+          type="text" 
+          v-model="breedValue" 
+          placeholder="Введите породу" 
+          class="breed-input"
+          :style="{ borderColor: color + '40' }"
+        />
+      </div>
+    </div> -->
+    
     <!-- Кастомный выбор времени -->
     <div class="time-picker-container" v-if="selectedDate && calendarMode === 'datetime'">
       <div class="time-picker-header">Выберите время</div>
@@ -58,13 +72,27 @@
       <button 
         class="confirm-button" 
         @click="confirmDate" 
-        :disabled="isLoading"
-        :class="{ 'loading': isLoading }"
-        :style="{ backgroundColor: isLoading ? 'var(--tg-theme-secondary-bg-color, #f0f0f0)' : color }"
+        :disabled="isLoading || !props.staffInfo || (props.staffInfo && !props.staffInfo.id)"
+        :class="{ 'loading': isLoading, 'disabled': !props.staffInfo || (props.staffInfo && !props.staffInfo.id) }"
+        :style="{ 
+          backgroundColor: isLoading ? 'var(--tg-theme-secondary-bg-color, #f0f0f0)' : 
+            (!props.staffInfo || (props.staffInfo && !props.staffInfo.id)) ? '#f44336' : color,
+          opacity: (!props.staffInfo || (props.staffInfo && !props.staffInfo.id)) ? '0.9' : '1',
+          boxShadow: (!props.staffInfo || (props.staffInfo && !props.staffInfo.id)) ? '0 4px 12px rgba(244, 67, 54, 0.3)' : '0 4px 8px rgba(0, 0, 0, 0.15)'
+        }"
       >
-        <span v-if="!isLoading">Подтвердить</span>
+        <span v-if="!isLoading">{{ (!props.staffInfo || (props.staffInfo && !props.staffInfo.id)) ? 'Выберите специалиста' : 'Подтвердить' }}</span>
         <span v-else class="button-spinner">Обработка...</span>
       </button>
+      
+      <div v-if="!props.staffInfo || (props.staffInfo && !props.staffInfo.id)" class="confirm-message">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f44336" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+        <span>Для продолжения необходимо выбрать специалиста</span>
+      </div>
     </div>
   </div>
 </template>
@@ -97,6 +125,14 @@ const props = defineProps({
     default: 'AniFit'
   },
   userEmail: {
+    type: String,
+    default: ''
+  },
+  staffInfo: {
+    type: Object,
+    default: null
+  },
+  petBreed: {
     type: String,
     default: ''
   }
@@ -134,6 +170,14 @@ const debugLogs = ref([]);
 const lastError = ref('');
 const requestStatus = ref('Готов');
 const maxLogs = 10;
+
+// Добавляем локальное состояние для породы
+const breedValue = ref(props.petBreed);
+
+// Следим за изменением props.petBreed
+watch(() => props.petBreed, (newValue) => {
+  breedValue.value = newValue;
+});
 
 // Функция выбора временного слота
 const selectTimeSlot = (timeSlot) => {
@@ -357,7 +401,7 @@ const sendDebugLog = (message, type = 'info') => {
   emit('debug-log', { message, type });
 };
 
-// Обработчик подтверждения даты
+// Обновляем функцию confirmDate для использования локального значения породы
 const confirmDate = async () => {
   if (isSubmitted.value || isLoading.value) {
     sendDebugLog('Запрос уже был отправлен, предотвращаем повторную отправку');
@@ -368,7 +412,25 @@ const confirmDate = async () => {
     isLoading.value = true;
     const currentRequestId = requestId.value;
     
-    sendDebugLog(`Подтверждение даты: ${selectedDate.value} ${selectedTimeSlot.value}`);
+    // Усиленная проверка выбора специалиста
+    if (!props.staffInfo || !props.staffInfo.id) {
+      sendDebugLog('Не выбран сотрудник для записи или ID сотрудника отсутствует', 'error');
+      throw new Error('Необходимо выбрать специалиста для записи');
+    }
+    
+    const isAnyStaff = props.staffInfo.id === 'any';
+    // Используем локальное значение породы вместо props.petBreed
+    const breedInfo = breedValue.value ? `\nПорода: ${breedValue.value}` : '';
+    
+    sendDebugLog(`Подтверждение даты: ${selectedDate.value} ${selectedTimeSlot.value} ${isAnyStaff ? 'с автоматическим назначением' : `с сотрудником: ${props.staffInfo.name}`}${breedInfo}`);
+    
+    // Собираем данные о событии
+    const summary = breedValue.value 
+      ? `${props.organizerName} - ${props.serviceName} - ${breedValue.value}`
+      : `${props.organizerName} - ${props.serviceName}`;
+    const description = isAnyStaff
+      ? `Запись на ${props.serviceName}\nСпециалист будет назначен автоматически${breedInfo}`
+      : `Запись на ${props.serviceName}\nСпециалист: ${props.staffInfo.name}, ${props.staffInfo.position}${breedInfo}`;
     
     // Создаем новую дату с выбранным временем
     const date = new Date(selectedDate.value);
@@ -376,10 +438,6 @@ const confirmDate = async () => {
     date.setMinutes(selectedMinute.value);
     date.setSeconds(0);
     date.setMilliseconds(0);
-    
-    // Собираем данные о событии
-    const summary = `${props.organizerName} - ${props.serviceName}`;
-    const description = `Запись на ${props.serviceName}`;
     
     // Вычисляем дату и время окончания события (добавляем продолжительность)
     const endDateTime = new Date(date);
@@ -405,7 +463,15 @@ const confirmDate = async () => {
       location: props.organizerLocation,
       attendees: [props.userEmail].filter(Boolean),
       requestId: currentRequestId,
-      color: props.color
+      color: props.color,
+      staffInfo: isAnyStaff
+        ? { id: 'any', autoAssign: true }
+        : {
+            id: props.staffInfo.id,
+            name: props.staffInfo.name,
+            position: props.staffInfo.position
+          },
+      petBreed: breedValue.value // Используем локальное значение породы
     };
     
     sendDebugLog(`Отправка данных события: ${JSON.stringify(eventData).substring(0, 100)}...`);
@@ -662,14 +728,18 @@ const confirmDate = async () => {
       emit('confirmed', { 
         date: startDateTimeISO,
         title: props.serviceName,
-        color: props.color
+        color: props.color,
+        staffInfo: props.staffInfo,
+        petBreed: breedValue.value // Используем локальное значение породы
       });
     } else {
       sendDebugLog(`Ошибка при создании события: ${response.error}`, 'error');
       emit('confirmed', { 
         date: startDateTimeISO,
         title: props.serviceName,
-        color: props.color
+        color: props.color,
+        staffInfo: props.staffInfo,
+        petBreed: breedValue.value // Используем локальное значение породы
       }, null, response.error || 'Ошибка при создании события');
     }
   } catch (error) {
@@ -677,7 +747,9 @@ const confirmDate = async () => {
     emit('confirmed', { 
       date: new Date(selectedDate.value).toISOString(),
       title: props.serviceName,
-      color: props.color
+      color: props.color,
+      staffInfo: props.staffInfo,
+      petBreed: breedValue.value // Используем локальное значение породы
     }, null, error.message || 'Ошибка при подтверждении даты');
   } finally {
     isLoading.value = false;
@@ -751,7 +823,7 @@ const confirmDate = async () => {
 }
 
 .confirm-button:disabled {
-  opacity: 0.7;
+  opacity: 0.9;
   cursor: not-allowed;
 }
 
@@ -1103,5 +1175,66 @@ const confirmDate = async () => {
 /* Скрываем последний vc-week элемент */
 :deep(.vc-weeks .vc-week:last-child) {
   display: none !important;
+}
+
+.confirm-message {
+  font-size: 13px;
+  color: #f44336;
+  text-align: center;
+  margin-top: 8px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  span {
+    margin-left: 8px;
+  }
+}
+
+/* Поле ввода породы */
+.breed-input-container {
+  width: 100%;
+  padding: 16px;
+  background-color: var(--tg-theme-bg-color, #ffffff);
+  border-radius: 12px;
+  margin-bottom: 16px;
+  animation: fadeIn 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.breed-input-header {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--tg-theme-text-color, #333333);
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.breed-input-wrapper {
+  display: flex;
+  justify-content: center;
+}
+
+.breed-input {
+  background-color: var(--tg-theme-bg-color, #ffffff);
+  border: 2px solid var(--tg-theme-secondary-bg-color, #f0f0f0);
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-size: 16px;
+  width: 100%;
+  color: var(--tg-theme-text-color, #333333);
+  appearance: none;
+  -webkit-appearance: none;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.breed-input:focus {
+  outline: none;
+  border-color: v-bind('color');
+  box-shadow: 0 0 0 2px v-bind('color + "20"');
+}
+
+.breed-input::placeholder {
+  color: var(--tg-theme-hint-color, #999999);
 }
 </style> 
