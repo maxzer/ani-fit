@@ -158,6 +158,13 @@ const updateDateWithTime = () => {
     date.setMinutes(selectedMinute.value);
     date.setSeconds(0);
     selectedDate.value = date;
+    
+    // Проверяем и устанавливаем selectedTimeSlot для текущего времени
+    const timeString = `${selectedHour.value}:${selectedMinute.value.toString().padStart(2, '0')}`;
+    const matchingSlot = timeSlots.find(slot => slot.value === timeString);
+    if (matchingSlot) {
+      selectedTimeSlot.value = matchingSlot.value;
+    }
   } catch (error) {
     // Ошибка при обновлении даты
   }
@@ -165,7 +172,13 @@ const updateDateWithTime = () => {
 
 // Следим за изменением часов и минут для обновления даты
 watch([selectedHour, selectedMinute], () => {
-  selectedTimeSlot.value = null; // Сбрасываем выбранный слот при ручном изменении
+  // Проверяем, соответствует ли выбранное время какому-либо из предустановленных слотов
+  const timeString = `${selectedHour.value}:${selectedMinute.value.toString().padStart(2, '0')}`;
+  const matchingSlot = timeSlots.find(slot => slot.value === timeString);
+  
+  // Устанавливаем соответствующий слот или null, если нет совпадений
+  selectedTimeSlot.value = matchingSlot ? matchingSlot.value : null;
+  
   updateDateWithTime();
 });
 
@@ -964,7 +977,7 @@ const confirmDate = async () => {
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease;
 }
 
 .time-slot-btn.active {
