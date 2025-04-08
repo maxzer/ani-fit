@@ -71,28 +71,28 @@ const initData = inject('initData', null);
 const cards = ref([
   {
     id: 1,
-    title: 'Тренировки',
+    title: 'Массаж',
     description: 'Индивидуальные программы тренировок',
     color: '#4caf50',
     image: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80'
   },
   {
     id: 2,
-    title: 'Питание',
+    title: 'Занятие в бассейне',
     description: 'Персональный план питания',
     color: '#2196f3',
     image: 'https://images.unsplash.com/photo-1490645935967-10de6ba17061?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80'
   },
   {
     id: 3,
-    title: 'Прогресс',
+    title: 'Аренда бассейна',
     description: 'Отслеживание результатов',
     color: '#ff9800',
     image: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80'
   },
   {
     id: 4,
-    title: 'Поддержка',
+    title: 'Занятие с хендлером',
     description: 'Консультации тренера',
     color: '#9c27b0',
     image: 'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80'

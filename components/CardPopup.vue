@@ -3,7 +3,17 @@
     <div v-if="isVisible" class="popup-overlay" @click.self="closePopup">
       <div class="popup-content" @click.stop>
         <div class="popup-header" :style="{ borderBottomColor: color + '30' }">
-          <h2>{{ title }}</h2>
+          <div class="header-left">
+            <h2>{{ title }}</h2>
+            <button 
+              v-if="activeView === 'booking'" 
+              class="price-list-button" 
+              @click="showPriceList"
+              :style="{ color: color }"
+            >
+              Прайс-лист
+            </button>
+          </div>
           <button class="close-button" @click="closePopup">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -12,46 +22,76 @@
           </button>
         </div>
         <div class="popup-body">
-          <!-- Строка с выбором специалиста и вводом породы -->
-          <div class="input-row">
-            <div class="input-col">
-              <StaffSelector 
-                v-if="showDatePicker"
-                :color="color"
-                @staffSelected="handleStaffSelected"
-                class="staff-selector-wrapper"
-              />
-            </div>
-            
-            <div class="input-col">
-              <div class="input-group breed-input-wrapper">
-                <input
-                  type="text"
-                  v-model="petBreed"
-                  placeholder="Введите породу"
-                  class="breed-input"
-                  :style="{ borderColor: color + '40' }"
+          <!-- Содержимое для режима бронирования -->
+          <div v-if="activeView === 'booking'">
+            <!-- Строка с выбором специалиста и вводом породы -->
+            <div class="input-row">
+              <div class="input-col">
+                <StaffSelector 
+                  v-if="showDatePicker"
+                  :color="color"
+                  @staffSelected="handleStaffSelected"
+                  class="staff-selector-wrapper"
                 />
               </div>
+              
+              <div class="input-col">
+                <div class="input-group breed-input-wrapper">
+                  <input
+                    type="text"
+                    v-model="petBreed"
+                    placeholder="Введите породу"
+                    class="breed-input"
+                    :style="{ borderColor: color + '40' }"
+                  />
+                </div>
+              </div>
             </div>
+            
+            <!-- Компонент календаря -->
+            <DatePicker 
+              v-if="showDatePicker" 
+              @dateSelected="handleDateSelected" 
+              @confirmed="handleDateConfirmed" 
+              @debug-log="handleDebugLog"
+              class="full-width-calendar"
+              :color="color"
+              :serviceName="title"
+              :organizerName="staffInfo ? staffInfo.name : 'AniFit'"
+              :serviceDuration="60"
+              :organizerLocation="'AniFit Студия'"
+              :userEmail="userEmail"
+              :staffInfo="staffInfo"
+              :petBreed="petBreed"
+            />
           </div>
           
-          <!-- Компонент календаря -->
-          <DatePicker 
-            v-if="showDatePicker" 
-            @dateSelected="handleDateSelected" 
-            @confirmed="handleDateConfirmed" 
-            @debug-log="handleDebugLog"
-            class="full-width-calendar"
-            :color="color"
-            :serviceName="title"
-            :organizerName="staffInfo ? staffInfo.name : 'AniFit'"
-            :serviceDuration="60"
-            :organizerLocation="'AniFit Студия'"
-            :userEmail="userEmail"
-            :staffInfo="staffInfo"
-            :petBreed="petBreed"
-          />
+          <!-- Содержимое для режима прайс-листа -->
+          <div v-else class="price-list-container">
+            <h3 class="price-list-title">Прайс-лист: {{ title }}</h3>
+            
+            <div class="price-items">
+              <div class="price-item" v-for="(item, index) in getPriceList()" :key="index">
+                <div class="price-item-info">
+                  <div class="price-item-name">{{ item.name }}</div>
+                  <div class="price-item-description">{{ item.description }}</div>
+                </div>
+                <div class="price-item-value" :style="{ color }">{{ item.price }} ₽</div>
+              </div>
+            </div>
+            
+            <div class="price-list-note">
+              <p>* Цены указаны за одно занятие. Возможны скидки при покупке абонемента.</p>
+            </div>
+            
+            <button 
+              class="book-now-button" 
+              @click="showBooking"
+              :style="{ backgroundColor: color }"
+            >
+              Записаться
+            </button>
+          </div>
           
           <!-- Индикатор загрузки -->
           <div v-if="isLoading" class="loading-indicator">
@@ -114,6 +154,9 @@ const staffInfo = ref(null);
 
 // Состояние для породы животного
 const petBreed = ref('');
+
+// Состояние для переключения между записью и прайс-листом
+const activeView = ref('booking'); // 'booking' или 'pricelist'
 
 // Состояние для уведомлений
 const notification = ref({
@@ -209,6 +252,7 @@ const closePopup = () => {
   selectedDate.value = null;
   staffInfo.value = null; // Сбрасываем информацию о специалисте
   petBreed.value = ''; // Сбрасываем информацию о породе
+  activeView.value = 'booking'; // Сбрасываем активный режим на запись
   emit('close');
 };
 
@@ -229,6 +273,45 @@ watch(() => props.isVisible, (newValue) => {
     }
   }
 });
+
+// Функции для переключения между режимами
+const showPriceList = () => {
+  activeView.value = 'pricelist';
+};
+
+const showBooking = () => {
+  activeView.value = 'booking';
+};
+
+// Функция для получения прайс-листа в зависимости от услуги
+const getPriceList = () => {
+  // Можно было бы загружать с сервера, но для демонстрации используем локальные данные
+  const priceListData = {
+    'Массаж': [
+      { name: 'Массаж 30 минут', description: 'Короткий сеанс для быстрого тонуса', price: 800 },
+      { name: 'Массаж 60 минут', description: 'Стандартный сеанс массажа', price: 1500 },
+      { name: 'Комплексный массаж', description: 'Полный курс массажа', price: 2200 }
+    ],
+    'Занятие в бассейне': [
+      { name: 'Групповое занятие', description: 'Тренировка до 3 собак', price: 700 },
+      { name: 'Индивидуальное занятие', description: 'Персональная тренировка', price: 1300 },
+      { name: 'Курс 5 занятий', description: 'Комплексная программа', price: 5500 }
+    ],
+    'Аренда бассейна': [
+      { name: 'Аренда 30 минут', description: 'Без тренера', price: 1000 },
+      { name: 'Аренда 60 минут', description: 'Без тренера', price: 1800 },
+      { name: 'Аренда с тренером', description: '60 минут с личным тренером', price: 2500 }
+    ],
+    'Занятие с хендлером': [
+      { name: 'Первичная консультация', description: 'Знакомство с хендлером', price: 1000 },
+      { name: 'Тренировка 45 минут', description: 'Обучение основам', price: 1500 },
+      { name: 'Комплексная подготовка', description: 'Подготовка к выставке', price: 3000 }
+    ]
+  };
+
+  // Возвращаем прайс-лист для текущей услуги или пустой массив
+  return priceListData[props.title] || [];
+};
 </script>
 
 <style scoped>
@@ -268,11 +351,34 @@ watch(() => props.isVisible, (newValue) => {
   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
 }
 
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .popup-header h2 {
   margin: 0;
   font-size: 22px;
   font-weight: 700;
   color: var(--tg-theme-text-color, #333333);
+}
+
+.price-list-button {
+  background: transparent;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 16px;
+  cursor: pointer;
+  color: var(--tg-theme-link-color, #2481cc);
+  background-color: rgba(36, 129, 204, 0.1);
+  transition: background-color 0.2s ease;
+}
+
+.price-list-button:active {
+  background-color: rgba(36, 129, 204, 0.2);
 }
 
 .close-button {
@@ -475,5 +581,112 @@ watch(() => props.isVisible, (newValue) => {
 
 .breed-input::placeholder {
   color: var(--tg-theme-hint-color, #999999);
+}
+
+.price-list-container {
+  width: 100%;
+  margin-top: 10px;
+  animation: fadeIn 0.3s ease;
+}
+
+.price-list-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 16px;
+  color: var(--tg-theme-text-color, #333333);
+  text-align: center;
+}
+
+.price-items {
+  width: 100%;
+  margin-bottom: 20px;
+  background-color: var(--tg-theme-bg-color, #ffffff);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.price-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  transition: background-color 0.2s ease;
+}
+
+.price-item:last-child {
+  border-bottom: none;
+}
+
+.price-item:active {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+.price-item-info {
+  flex: 1;
+}
+
+.price-item-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--tg-theme-text-color, #333333);
+  margin-bottom: 4px;
+}
+
+.price-item-description {
+  font-size: 13px;
+  color: var(--tg-theme-hint-color, #999999);
+}
+
+.price-item-value {
+  font-size: 16px;
+  font-weight: 700;
+  padding: 6px 10px;
+  background-color: rgba(36, 129, 204, 0.1);
+  border-radius: 8px;
+  min-width: 80px;
+  text-align: center;
+}
+
+.price-list-note {
+  font-size: 13px;
+  color: var(--tg-theme-hint-color, #999999);
+  margin: 12px 0 20px;
+  background-color: rgba(0, 0, 0, 0.03);
+  padding: 10px;
+  border-radius: 8px;
+  border-left: 3px solid var(--tg-theme-hint-color, #999999);
+}
+
+.book-now-button {
+  background-color: var(--tg-theme-button-color, #2481cc);
+  color: white;
+  border: none;
+  padding: 14px 20px;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  width: 100%;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.book-now-button:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 </style> 
