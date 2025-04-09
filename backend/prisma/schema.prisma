@@ -9,7 +9,29 @@ datasource db {
 }
 
 model User {
-  id    Int     @id @default(autoincrement())
-  name  String
-  email String  @unique
+  id         Int     @id @default(autoincrement())
+  telegramId String  @default("")
+  firstName  String  @default("")
+  lastName   String  @default("")
+  email      String  @unique
+  
+  // Дополнительные поля
+  photoUrl   String? 
+  username   String?
+  sessions   Session[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("users")
+}
+
+model Session {
+  id        Int      @id @default(autoincrement())
+  token     String   @unique
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@map("sessions")
 } 
