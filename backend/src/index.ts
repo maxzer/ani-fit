@@ -2,6 +2,7 @@ import fastify from 'fastify'
 import cors from '@fastify/cors'
 import { PrismaClient } from '@prisma/client'
 import { execSync } from 'child_process'
+import { google } from 'googleapis'
 
 const MAX_RETRIES = 10;
 const RETRY_DELAY = 5000; // 5 секунд
@@ -38,6 +39,20 @@ async function waitForDatabase() {
   return false;
 }
 
+// Функция для настройки Google Calendar API
+function setupGoogleCalendar() {
+  const privateKey = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+  const jwtClient = new google.auth.JWT(
+    process.env.GOOGLE_CLIENT_EMAIL,
+    undefined,
+    privateKey,
+    ['https://www.googleapis.com/auth/calendar']
+  );
+
+  const calendar = google.calendar({ version: 'v3', auth: jwtClient });
+  return { jwtClient, calendar };
+}
+
 // Основная функция запуска
 async function bootstrap() {
   // Ожидаем готовности базы данных
@@ -68,6 +83,9 @@ async function bootstrap() {
     allowedHeaders: ['Content-Type', 'Authorization']
   });
   
+  // Настройка Google Calendar
+  const { jwtClient, calendar } = setupGoogleCalendar();
+  
   // Routes
   app.get('/ping', async () => {
     return { status: 'ok' };
@@ -84,6 +102,53 @@ async function bootstrap() {
       data: { name, email }
     });
     return user;
+  });
+  
+  // Добавляем новый маршрут для календаря
+  app.post('/api/calendar/add-event', async (request, reply) => {
+    try {
+      await jwtClient.authorize();
+      
+      const { summary, description, startDateTime, endDateTime, attendees } = 
+        request.body as { 
+          summary: string; 
+          description: string; 
+          startDateTime: string; 
+          endDateTime: string;
+          attendees?: { email: string }[];
+        };
+      
+      const event = {
+        summary,
+        description,
+        start: {
+          dateTime: startDateTime,
+          timeZone: 'Europe/Moscow',
+        },
+        end: {
+          dateTime: endDateTime,
+          timeZone: 'Europe/Moscow',
+        },
+        attendees: attendees || [],
+      };
+      
+      const result = await calendar.events.insert({
+        calendarId: process.env.GOOGLE_CALENDAR_ID,
+        requestBody: event,
+      });
+      
+      return {
+        success: true,
+        eventId: result.data.id,
+        htmlLink: result.data.htmlLink
+      };
+    } catch (error) {
+      console.error('Error creating calendar event:', error);
+      reply.status(500).send({ 
+        success: false, 
+        error: 'Не удалось создать событие в календаре' 
+      });
+    }
   });
   
   try {

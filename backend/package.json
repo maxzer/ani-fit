@@ -13,7 +13,8 @@
   "dependencies": {
     "@fastify/cors": "^8.4.1",
     "@prisma/client": "^5.10.0",
-    "fastify": "^4.26.1"
+    "fastify": "^4.26.1",
+    "googleapis": "^148.0.0"
   },
   "devDependencies": {
     "@types/node": "^20.11.19",
@@ -24,4 +25,4 @@
   "prisma": {
     "schema": "prisma/schema.prisma"
   }
-} 
+}
