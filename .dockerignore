@@ -1,13 +1,38 @@
+# Node modules and dependencies
 node_modules
-.nuxt
+npm-debug.log
+
+# Build artifacts
 .output
+.nuxt
+dist
+
+# Git
 .git
-.env
-.github
+.gitignore
+
+# Docker
+.dockerignore
+Dockerfile
+docker-compose.yml
+
+# Backend
+backend/
+server/
+
+# IDE
 .vscode
 .idea
+
+# Logs
+logs
+*.log
+
+# Cache
+.npm
+.cache
+
+.env
+.github
 start.sh
-*.md
-.gitignore
-docker-compose.yml
-nginx 
+*.md 

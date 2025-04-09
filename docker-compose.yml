@@ -2,8 +2,8 @@ version: '3.8'
 
 services:
   # Nuxt.js приложение
-  app:
-    container_name: ani-fit-app
+  frontend:
+    container_name: ani-fit-frontend
     build:
       context: .
       dockerfile: Dockerfile
@@ -12,29 +12,90 @@ services:
       - NODE_ENV=production
       - NUXT_PORT=3000
       - NUXT_HOST=0.0.0.0
+      - API_URL=http://backend:3001
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+          cpus: '2'
+        reservations:
+          memory: 4G
+          cpus: '1'
     expose:
       - "3000"
+    depends_on:
+      - db
+      - backend
     networks:
       - ani-fit-network
     healthcheck:
       test: wget --no-verbose --tries=1 --spider http://localhost:3000/ || exit 1
-      interval: 10s
+      interval: 30s
       timeout: 10s
       retries: 5
+      start_period: 60s
+
+  backend:
+    container_name: ani-fit-backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/ani_fit?schema=public
+    volumes:
+      - ./backend/prisma:/app/prisma
+      - backend_node_modules:/app/node_modules
+    expose:
+      - "3001"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - ani-fit-network
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://localhost:3001/ping || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  db:
+    container_name: ani-fit-db
+    image: postgres:15
+    restart: always
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=ani_fit
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - ani-fit-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   # Nginx для проксирования запросов
   nginx:
     container_name: ani-fit-nginx
-    image: nginx:alpine
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
     restart: always
-    depends_on:
-      - app
     ports:
       - "80:80"
       - "443:443"
-    volumes:
-      - ./nginx/conf.d/default.conf:/etc/nginx/conf.d/default.conf
-      - ./nginx/ssl:/etc/nginx/ssl
+    depends_on:
+      - frontend
+      - backend
     networks:
       - ani-fit-network
     healthcheck:
@@ -46,3 +107,7 @@ services:
 networks:
   ani-fit-network:
     driver: bridge
+
+volumes:
+  postgres_data:
+  backend_node_modules:
