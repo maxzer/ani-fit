@@ -7,13 +7,17 @@ npx prisma generate
 echo "Waiting for database..."
 sleep 5
 
+# Очищаем директорию миграций если она существует
+echo "Cleaning migrations directory..."
+rm -rf prisma/migrations/*
+
 # Сбрасываем и инициализируем базу данных
 echo "Resetting database..."
-npx prisma migrate reset --force --skip-generate --skip-seed
+npx prisma migrate reset --force
 
 # Создаем и применяем миграции
 echo "Creating initial migration..."
-npx prisma migrate dev --name init --create-only --skip-generate --skip-seed
+npx prisma migrate dev --name init --create-only
 
 echo "Applying migrations..."
 npx prisma migrate deploy
