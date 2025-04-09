@@ -18,7 +18,6 @@ docker-compose.yml
 
 # Backend
 backend/
-server/
 
 # IDE
 .vscode
@@ -35,4 +34,6 @@ logs
 .env
 .github
 start.sh
-*.md 
+*.md
+scripts
+snippets 
