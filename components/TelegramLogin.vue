@@ -463,8 +463,8 @@ async function handleLogin() {
     networkDetails.value.request = authRequest;
     
     // Отправляем запрос на новый эндпоинт API (telegram-api)
-    addDebugLog('Отправляем запрос на авторизацию через Telegram API...');
-    const response = await axios.post(`${apiUrl}/api/auth/telegram-api`, authRequest);
+    addDebugLog('Отправляем запрос на авторизацию...');
+    const response = await axios.post(`${apiUrl}/telegram`, authRequest);
     
     // Обрабатываем ответ
     networkDetails.value.response = response.data;
