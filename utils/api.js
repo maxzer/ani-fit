@@ -32,16 +32,10 @@ export const getApiUrl = (endpoint) => {
 };
 
 export const telegramLogin = async (data) => {
-  const url = getApiUrl('/telegram');
-  console.log('Отправка запроса на:', url);
-  console.log('Метод:', 'POST');
-  console.log('Данные:', data);
   try {
     const response = await fetchApi('/telegram', { method: 'POST', body: JSON.stringify(data) });
-    console.log('Ответ:', response);
     return response;
   } catch (error) {
-    console.error('Ошибка при запросе /telegram:', error);
     throw error;
   }
 };
