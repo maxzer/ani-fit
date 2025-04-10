@@ -195,7 +195,8 @@ export function registerAuthMiddleware(fastify: FastifyInstance, prisma: PrismaC
     
     // Проверяем ограничения запросов для маршрутов авторизации и профиля
     if (
-      path === '/auth/telegram' ||
+      path === '/api/auth/telegram' ||
+      path === '/auth/telegram' || // TODO remove after frontend migration
       path === '/auth/profile' ||
       path === '/api/auth/raw' ||
       path === '/api/auth/profile'

@@ -1,5 +1,10 @@
 import { defineNuxtPlugin } from '#app';
 
+const script = document.createElement('script');
+script.src = 'https://telegram.org/js/telegram-web-app.js';
+script.async = false;
+document.head.appendChild(script);
+
 export default defineNuxtPlugin((nuxtApp) => {
   // Выполняем только в браузере
   if (typeof window === 'undefined') return;
@@ -15,9 +20,6 @@ export default defineNuxtPlugin((nuxtApp) => {
       
       // Гарантированно раскрываем на полный экран
       webApp.expand();
-      
-      // Дополнительные вызовы expand с задержкой для гарантии полноэкранного режима
-      setTimeout(() => webApp.expand(), 300);
       setTimeout(() => webApp.expand(), 1000);
       
       // Отключаем сообщение о выходе из приложения

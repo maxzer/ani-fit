@@ -9,6 +9,9 @@ import { registerAuthMiddleware } from './auth/auth.middleware'
 const MAX_RETRIES = 10;
 const RETRY_DELAY = 5000; // 5 секунд
 
+// Проверяем наличие TELEGRAM_BOT_TOKEN
+if (!process.env.TELEGRAM_BOT_TOKEN) throw new Error('TELEGRAM_BOT_TOKEN is not defined');
+
 // Функция для ожидания доступности базы данных
 async function waitForDatabase() {
   let retries = 0;

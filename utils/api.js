@@ -1,5 +1,5 @@
 // Импортируем useRuntimeConfig для доступа к конфигурации
-import { useRuntimeConfig } from '#app';
+import axios from 'axios';
 
 // Get the base URL based on the environment
 export const getBaseUrl = () => {
@@ -54,4 +54,15 @@ export const fetchApi = async (endpoint, options = {}) => {
   } catch (error) {
     throw error;
   }
-}; 
+};
+
+export const telegramLogin = async (authData) => {
+  try {
+    const url = getApiUrl('/telegram');
+    const response = await axios.post(url, authData);
+    return response.data;
+  } catch (error) {
+    console.error('Ошибка при попытке входа через Telegram:', error);
+    throw error;
+  }
+};
