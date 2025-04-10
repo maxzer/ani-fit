@@ -112,7 +112,7 @@ export default async function authController(fastify: FastifyInstance, prisma: P
     );
   }
 
-  fastify.post('/telegram', async (request, reply) => {
+  fastify.post('/telegram', async (request: FastifyRequest, reply: FastifyReply) => {
     const clientIp = request.ip;
     console.log(`[AUTH] Получены данные: ${JSON.stringify(request.body)}`);
     const origin = request.headers.origin || 'unknown';
