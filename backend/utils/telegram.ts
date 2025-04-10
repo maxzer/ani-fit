@@ -5,6 +5,8 @@ dotenv.config();
 
 export function verifyTelegramData(data: any): boolean {
   console.log('Received data:', data);
+  console.log('TELEGRAM_BOT_TOKEN:', process.env.TELEGRAM_BOT_TOKEN);
+  console.log('Starting verifyTelegramData function');
 
   if (!data) {
     console.error('Data is empty!');

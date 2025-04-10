@@ -31,6 +31,21 @@ export const getApiUrl = (endpoint) => {
   return `${baseUrl}${formattedEndpoint}`;
 };
 
+export const telegramLogin = async (data) => {
+  const url = getApiUrl('/telegram');
+  console.log('Отправка запроса на:', url);
+  console.log('Метод:', 'POST');
+  console.log('Данные:', data);
+  try {
+    const response = await fetchApi('/telegram', { method: 'POST', body: JSON.stringify(data) });
+    console.log('Ответ:', response);
+    return response;
+  } catch (error) {
+    console.error('Ошибка при запросе /telegram:', error);
+    throw error;
+  }
+};
+
 // Функция для выполнения API-запросов
 export const fetchApi = async (endpoint, options = {}) => {
   try {

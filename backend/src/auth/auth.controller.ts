@@ -114,6 +114,7 @@ export default async function authController(fastify: FastifyInstance, prisma: P
 
   fastify.post('/telegram', async (request, reply) => {
     const clientIp = request.ip;
+    console.log(`[AUTH] Получены данные: ${JSON.stringify(request.body)}`);
     const origin = request.headers.origin || 'unknown';
     console.log(`[AUTH] Запрос авторизации от IP: ${clientIp}, origin: ${origin}`);
     
@@ -216,6 +217,7 @@ export default async function authController(fastify: FastifyInstance, prisma: P
         return reply.status(200).send({ token, temp: true, success: true });
       }
     } catch (error) {
+      console.error(`[AUTH] Ошибка при обработке запроса: ${error}`);
       console.error('Ошибка при обработке авторизации:', error);
       return reply.status(500).send({ error: 'Внутренняя ошибка сервера', success: false });
     }
