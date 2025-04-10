@@ -195,7 +195,8 @@ export function registerAuthMiddleware(fastify: FastifyInstance, prisma: PrismaC
     
     // Проверяем ограничения запросов для маршрутов авторизации и профиля
     if (
-      path === '/auth/telegram' ||
+      path === '/auth/telegram' || // Публичный маршрут, не требует аутентификации
+      path === '/api/auth/telegram' || // Публичный маршрут, не требует аутентификации
       path === '/auth/profile' ||
       path === '/api/auth/raw' ||
       path === '/api/auth/profile'
@@ -204,7 +205,7 @@ export function registerAuthMiddleware(fastify: FastifyInstance, prisma: PrismaC
       return;
     }
     
-    // Для всех остальных маршрутов применяем middleware аутентификации
+    // Для всех остальных маршрутов (кроме указанных выше) применяем middleware аутентификации
     middleware(request, reply, done);
   });
 } 

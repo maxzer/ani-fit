@@ -112,8 +112,7 @@ export default async function authController(fastify: FastifyInstance, prisma: P
     );
   }
 
-  // Единственный актуальный метод авторизации через Telegram API
-  fastify.post('/api/auth/telegram-api', async (request, reply) => {
+  fastify.post('/telegram', async (request, reply) => {
     const clientIp = request.ip;
     const origin = request.headers.origin || 'unknown';
     console.log(`[AUTH] Запрос авторизации от IP: ${clientIp}, origin: ${origin}`);
