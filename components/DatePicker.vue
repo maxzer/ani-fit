@@ -1143,6 +1143,7 @@ const confirmDate = async () => {
   font-family: monospace;
   font-size: 12px;
   border-left: 3px solid #ff5722;
+  user-select: text;
 }
 
 .debug-status {
@@ -1151,6 +1152,7 @@ const confirmDate = async () => {
   border-radius: 4px;
   background-color: #333;
   display: inline-block;
+  user-select: text;
 }
 
 .debug-error {
@@ -1159,17 +1161,20 @@ const confirmDate = async () => {
   padding: 8px;
   border-radius: 4px;
   border-left: 3px solid #f44336;
+  user-select: text;
 }
 
 .error-title {
   font-weight: bold;
   color: #f44336;
   margin-bottom: 4px;
+  user-select: text;
 }
 
 .error-message {
   color: #ff8a80;
   word-break: break-word;
+  user-select: text;
 }
 
 /* Скрываем последний vc-week элемент */

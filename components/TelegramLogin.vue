@@ -853,6 +853,7 @@ function toggleFullscreenDebug(event) {
   z-index: 1000;
   transition: all 0.3s ease;
   font-size: 14px;
+  user-select: text;
 }
 
 .debug-panel--fullscreen {
@@ -903,6 +904,7 @@ function toggleFullscreenDebug(event) {
   max-height: calc(100vh - 60px);
   scrollbar-width: thin;
   scrollbar-color: #555 #333;
+  user-select: text;
 }
 
 .debug-panel__content::-webkit-scrollbar {
@@ -976,6 +978,7 @@ function toggleFullscreenDebug(event) {
   padding: 5px;
   scrollbar-width: thin;
   scrollbar-color: #555 #222;
+  user-select: text;
 }
 
 .debug-log::-webkit-scrollbar {
@@ -1018,6 +1021,7 @@ function toggleFullscreenDebug(event) {
   flex: 1;
   color: #ddd;
   word-break: break-word;
+  user-select: text;
 }
 
 /* Исправляем высоту при изменении размера экрана */
@@ -1049,6 +1053,7 @@ function toggleFullscreenDebug(event) {
   margin: 8px 0;
   scrollbar-width: thin;
   scrollbar-color: #555 #222;
+  user-select: text;
 }
 
 .debug-code pre {
@@ -1060,6 +1065,7 @@ function toggleFullscreenDebug(event) {
   color: #eee;
   word-break: break-word;
   white-space: pre-wrap;
+  user-select: text;
 }
 
 .error-code {

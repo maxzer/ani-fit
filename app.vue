@@ -551,6 +551,7 @@ provide('updateInitData', updateInitData);
   font-size: 12px;
   max-height: 40vh;
   overflow: auto;
+  user-select: text;
 }
 
 .debug-header {
@@ -566,6 +567,7 @@ provide('updateInitData', updateInitData);
 .debug-content {
   padding: 10px;
   line-height: 1.4;
+  user-select: text;
 }
 
 .debug-content pre {
@@ -575,5 +577,6 @@ provide('updateInitData', updateInitData);
   padding: 5px;
   border-radius: 4px;
   margin: 5px 0;
+  user-select: text;
 }
 </style>
