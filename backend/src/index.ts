@@ -3,6 +3,8 @@ import cors from '@fastify/cors'
 import { PrismaClient } from '@prisma/client'
 import { execSync } from 'child_process'
 import { google } from 'googleapis'
+import authController from './auth/auth.controller'
+import { registerAuthMiddleware } from './auth/auth.middleware'
 
 const MAX_RETRIES = 10;
 const RETRY_DELAY = 5000; // 5 секунд
@@ -77,11 +79,19 @@ async function bootstrap() {
   
   // CORS
   app.register(cors, {
-    origin: ['https://maxzer.ru', 'https://www.maxzer.ru'],
+    origin: process.env.NODE_ENV === 'production' 
+      ? ['https://maxzer.ru', 'https://www.maxzer.ru'] 
+      : true,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
   });
+  
+  // Регистрируем контроллер аутентификации
+  await authController(app, prisma);
+  
+  // Регистрируем middleware для защищенных маршрутов
+  registerAuthMiddleware(app, prisma);
   
   // Настройка Google Calendar
   const { jwtClient, calendar } = setupGoogleCalendar();
@@ -164,6 +174,31 @@ async function bootstrap() {
         error: 'Не удалось создать событие в календаре' 
       });
     }
+  });
+  
+  // Добавляем API прокси для совместимости с новыми путями
+  app.post('/api/auth', async (request, reply) => {
+    // Перенаправляем запрос на существующий обработчик /auth/telegram
+    await app.inject({
+      method: 'POST',
+      url: '/auth/telegram',
+      payload: JSON.stringify(request.body),
+      headers: request.headers
+    }).then(response => {
+      reply.code(response.statusCode).send(JSON.parse(response.payload));
+    });
+  });
+  
+  app.post('/api/profile', async (request, reply) => {
+    // Перенаправляем запрос на существующий обработчик /auth/profile
+    await app.inject({
+      method: 'POST',
+      url: '/auth/profile',
+      payload: JSON.stringify(request.body),
+      headers: request.headers
+    }).then(response => {
+      reply.code(response.statusCode).send(JSON.parse(response.payload));
+    });
   });
   
   try {

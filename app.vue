@@ -1,8 +1,73 @@
 <template>
   <div class="app-container" :data-theme="theme?.colorScheme || 'light'">
+    <!-- Отладочная панель -->
+    <!-- <div class="debug-panel" :class="{ 'debug-panel--expanded': isDebugExpanded }"> -->
+      <!-- <div class="debug-panel__header" @click="toggleDebugPanel"> -->
+        <!-- <span>Отладочная информация</span> -->
+        <!-- <span class="debug-panel__toggle">{{ isDebugExpanded ? '▼' : '▲' }}</span> -->
+      <!-- </div> -->
+      <!-- <div v-if="isDebugExpanded" class="debug-panel__content">
+        <div class="debug-panel__section">
+          <h3>Состояние приложения</h3>
+          <table class="debug-table">
+            <tr>
+              <td>WebApp доступен:</td>
+              <td>{{ isTelegramWebAppAvailable }}</td>
+            </tr>
+            <tr>
+              <td>Загрузка:</td>
+              <td>{{ isLoading }}</td>
+            </tr>
+            <tr>
+              <td>Тестовый режим:</td>
+              <td>{{ isTestMode }}</td>
+            </tr>
+            <tr>
+              <td>Авторизован:</td>
+              <td>{{ isAuthenticated }}</td>
+            </tr>
+            <tr>
+              <td>Нужен профиль:</td>
+              <td>{{ needsProfile }}</td>
+            </tr>
+            <tr>
+              <td>Последняя ошибка:</td>
+              <td>{{ lastError || 'нет' }}</td>
+            </tr>
+          </table>
+        </div>
+        
+        <div class="debug-panel__section">
+          <h3>Данные инициализации</h3>
+          <pre class="debug-pre">{{ initData ? JSON.stringify(initData, null, 2) : 'отсутствуют' }}</pre>
+        </div>
+        
+        <div class="debug-panel__section">
+          <h3>Пользователь</h3>
+          <pre class="debug-pre">{{ user ? JSON.stringify(user, null, 2) : 'не авторизован' }}</pre>
+        </div>
+        
+        <div class="debug-panel__section">
+          <h3>События</h3>
+          <div class="debug-logs">
+            <div v-for="(log, index) in logEvents" :key="index" class="debug-log">
+              {{ log.time }} - {{ log.message }}
+            </div>
+          </div>
+        </div>
+      </div> -->
+    <!-- </div> -->
+
     <div v-if="!isLoading && isTelegramWebAppAvailable && initData">
       <div v-if="isTestMode" class="test-mode-badge">Тестовый режим</div>
-      <NuxtPage />
+      
+      <!-- Если не авторизован, показываем компонент авторизации -->
+      <div v-if="!isAuthenticated">
+        <TelegramLogin v-if="!needsProfile" />
+        <ProfileForm v-else />
+      </div>
+      <!-- Иначе показываем основное содержимое -->
+      <NuxtPage v-else />
     </div>
     <div v-else-if="!isTelegramWebAppAvailable" class="loading-container">
       <div class="loading-spinner"></div>
@@ -12,19 +77,40 @@
     <div v-else class="loading-container">
       <div class="loading-spinner"></div>
       <p class="loading-text">Загрузка приложения...</p>
+      <button @click="initTestMode" class="test-mode-button">Запустить в тестовом режиме</button>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, reactive, provide, computed } from 'vue';
+import { ref, onMounted, reactive, provide, computed, watch, onBeforeUnmount } from 'vue';
 import { getTelegramTheme, isTelegramWebAppReady, getInitData } from './utils/telegram.js';
+import TelegramLogin from './components/TelegramLogin.vue';
+import ProfileForm from './components/ProfileForm.vue';
 import '@/assets/css/theme.css';
+import axios from 'axios';
+
+// Отладочные переменные
+const showDebug = ref(false);
+const lastError = ref('');
+const toggleDebug = () => {
+  showDebug.value = !showDebug.value;
+};
+
+// Предоставляем доступ к отладочной информации
+provide('lastError', lastError);
 
 // Состояние WebApp
 const isTelegramWebAppAvailable = ref(false);
 const isLoading = ref(true);
 const initData = ref(null);
+
+// Состояние авторизации
+const authToken = ref('');
+const tempAuthToken = ref('');
+const user = ref(null);
+const needsProfile = ref(false);
+const isAuthenticated = ref(false);
 
 // Инициализация темы с дефолтными значениями
 const theme = reactive({
@@ -44,6 +130,13 @@ provide('telegramTheme', theme);
 provide('isLoading', isLoading);
 provide('initData', initData);
 
+// Предоставляем доступ к данным авторизации
+provide('authToken', authToken);
+provide('tempAuthToken', tempAuthToken);
+provide('user', user);
+provide('isAuthenticated', isAuthenticated);
+provide('needsProfile', needsProfile);
+
 // Определяем, находимся ли мы в тестовом режиме
 const isTestMode = computed(() => {
   return typeof window !== 'undefined' && (
@@ -51,6 +144,84 @@ const isTestMode = computed(() => {
     (initData.value && initData.value.user && initData.value.user.id === 12345678)
   );
 });
+
+provide('isTestMode', isTestMode);
+
+// Функции для управления авторизацией
+const setAuth = (token, userData) => {
+  authToken.value = token;
+  user.value = userData;
+  isAuthenticated.value = true;
+  needsProfile.value = false;
+  tempAuthToken.value = '';
+  
+  // Сохраняем данные в localStorage
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('authToken', token);
+    localStorage.setItem('user', JSON.stringify(userData));
+  }
+  
+  // Устанавливаем заголовок авторизации по умолчанию для axios
+  axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+};
+
+// Установка временной авторизации (для заполнения профиля)
+const setTempAuth = (token, userData) => {
+  tempAuthToken.value = token;
+  user.value = userData;
+  needsProfile.value = true;
+  isAuthenticated.value = false;
+};
+
+// Выход из аккаунта
+const logout = () => {
+  authToken.value = '';
+  tempAuthToken.value = '';
+  user.value = null;
+  isAuthenticated.value = false;
+  needsProfile.value = false;
+  
+  // Очищаем данные из localStorage
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('user');
+  }
+  
+  // Удаляем заголовок авторизации
+  delete axios.defaults.headers.common['Authorization'];
+};
+
+// Предоставляем функции авторизации другим компонентам
+provide('setAuth', setAuth);
+provide('setTempAuth', setTempAuth);
+provide('logout', logout);
+
+// Проверка сохраненной авторизации при загрузке
+const checkAuth = () => {
+  if (typeof window !== 'undefined') {
+    const savedToken = localStorage.getItem('authToken');
+    const savedUser = localStorage.getItem('user');
+    
+    if (savedToken && savedUser) {
+      try {
+        const userData = JSON.parse(savedUser);
+        setAuth(savedToken, userData);
+        return true;
+      } catch (error) {
+        console.error('Ошибка при восстановлении авторизации:', error);
+        logout();
+      }
+    }
+  }
+  return false;
+};
+
+// Функция для обработки ошибок
+const logError = (message, error) => {
+  console.error(message, error);
+  lastError.value = `${message}: ${error?.message || JSON.stringify(error)}`;
+  return false;
+};
 
 // Функция для инициализации WebApp
 const initializeWebApp = async () => {
@@ -83,6 +254,7 @@ const initializeWebApp = async () => {
       }
     } catch (error) {
       // Ошибка при вызове webApp.ready()
+      return logError('Ошибка при инициализации WebApp', error);
     }
     
     // Шаг 2: Получаем и применяем тему
@@ -98,6 +270,7 @@ const initializeWebApp = async () => {
       }
     } catch (error) {
       // Ошибка при получении темы
+      logError('Ошибка при получении темы', error);
     }
     
     // Шаг 3: Получаем initData
@@ -107,11 +280,19 @@ const initializeWebApp = async () => {
       if (data) {
         // Сохраняем данные
         initData.value = data;
+        
+        // Проверяем сохраненную авторизацию
+        const hasAuth = checkAuth();
+        
         // Завершаем загрузку
         isLoading.value = false;
         return true;
       } else {
         // Если после ready() все еще нет данных, но WebApp доступен
+        
+        // Проверяем сохраненную авторизацию
+        const hasAuth = checkAuth();
+        lastError.value = 'Не удалось получить initData, но WebApp доступен';
         
         // В некоторых случаях мы все равно можем продолжить
         isLoading.value = false;
@@ -119,11 +300,16 @@ const initializeWebApp = async () => {
       }
     } catch (error) {
       // Ошибка при получении initData
+      
+      // Проверяем сохраненную авторизацию
+      const hasAuth = checkAuth();
+      
       isLoading.value = false;
-      return false;
+      return logError('Ошибка при получении initData', error);
     }
   }
   
+  lastError.value = 'WebApp недоступен (window.Telegram.WebApp не найден)';
   return false;
 };
 
@@ -146,6 +332,17 @@ const initTestMode = () => {
   // Устанавливаем флаги доступности
   isTelegramWebAppAvailable.value = true;
   isLoading.value = false;
+  
+  // В тестовом режиме по умолчанию не авторизуем пользователя автоматически
+  // Только проверяем сохраненную авторизацию
+  const hasAuth = checkAuth();
+  
+  // Если авторизации нет, явно устанавливаем флаги для отображения формы авторизации
+  if (!hasAuth) {
+    isAuthenticated.value = false;
+    needsProfile.value = false;
+    logout(); // Сбрасываем состояние авторизации, если оно было
+  }
 };
 
 // Инициализация приложения
@@ -212,6 +409,44 @@ onMounted(async () => {
     }, 500);
   }
 });
+
+// Отладочное состояние
+const isDebugExpanded = ref(false);
+const logEvents = ref([]);
+
+// Добавление события лога
+const logEvent = (message) => {
+  const now = new Date();
+  const time = `${now.getHours()}:${now.getMinutes()}:${now.getSeconds()}.${now.getMilliseconds()}`;
+  logEvents.value.unshift({ time, message });
+  // Ограничиваем до 20 событий
+  if (logEvents.value.length > 20) {
+    logEvents.value = logEvents.value.slice(0, 20);
+  }
+  console.log(`[App] ${message}`);
+};
+
+// Вкл/Выкл отладочной панели
+const toggleDebugPanel = () => {
+  isDebugExpanded.value = !isDebugExpanded.value;
+  logEvent(`Отладочная панель ${isDebugExpanded.value ? 'развернута' : 'свернута'}`);
+};
+
+// Очистка перед уничтожением компонента
+onBeforeUnmount(() => {
+  logEvent('Приложение завершает работу');
+});
+
+// Функция для обновления initData извне (например, из компонентов)
+const updateInitData = (newData) => {
+  if (newData) {
+    initData.value = newData;
+    logEvent(`initData обновлен: id=${newData.user?.id}`);
+  }
+};
+
+// Предоставляем функцию обновления initData
+provide('updateInitData', updateInitData);
 </script>
 
 <style>
@@ -302,5 +537,43 @@ onMounted(async () => {
   border-radius: 4px;
   font-size: 12px;
   font-weight: 600;
+}
+
+/* Стили для отладочной панели */
+.debug-panel {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: rgba(0, 0, 0, 0.8);
+  color: #fff;
+  z-index: 9999;
+  font-size: 12px;
+  max-height: 40vh;
+  overflow: auto;
+}
+
+.debug-header {
+  padding: 5px 10px;
+  background-color: #ff9800;
+  font-weight: bold;
+  cursor: pointer;
+  text-align: center;
+  position: sticky;
+  top: 0;
+}
+
+.debug-content {
+  padding: 10px;
+  line-height: 1.4;
+}
+
+.debug-content pre {
+  max-height: 100px;
+  overflow: auto;
+  background-color: rgba(255, 255, 255, 0.1);
+  padding: 5px;
+  border-radius: 4px;
+  margin: 5px 0;
 }
 </style>

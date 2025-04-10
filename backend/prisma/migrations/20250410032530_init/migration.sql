@@ -7,6 +7,7 @@ CREATE TABLE "users" (
     "email" TEXT NOT NULL,
     "photoUrl" TEXT,
     "username" TEXT,
+    "telegramData" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 

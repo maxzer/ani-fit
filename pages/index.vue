@@ -1,7 +1,18 @@
 <template>
   <div class="main-page">
-    <div v-if="initData?.user" class="user-info">
-      <div class="section-title">Добро пожаловать, {{ initData.user.first_name }}!</div>
+    <div v-if="user" class="user-info">
+      <div class="user-avatar" v-if="user.photoUrl">
+        <img :src="user.photoUrl" alt="Аватар" />
+      </div>
+      <div class="user-details">
+        <div class="section-title">Добро пожаловать, {{ user.firstName }}!</div>
+        <button @click="handleLogout" class="logout-button">
+          <svg class="logout-icon" viewBox="0 0 24 24">
+            <path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"></path>
+          </svg>
+          Выйти
+        </button>
+      </div>
     </div>
     <div v-else class="section-title">Пользователь</div>
     
@@ -67,6 +78,10 @@ const telegramTheme = inject('telegramTheme', { colorScheme: 'dark' });
 const isLoading = inject('isLoading', false);
 const initData = inject('initData', null);
 
+// Получаем данные пользователя из глобального состояния
+const user = inject('user', null);
+const logout = inject('logout', () => {});
+
 // Данные карточек
 const cards = ref([
   {
@@ -108,6 +123,14 @@ const notification = ref({
   message: '',
   type: 'success'
 });
+
+// Обработчик выхода из аккаунта
+const handleLogout = () => {
+  logout();
+  
+  // Показываем уведомление
+  showNotification('Вы успешно вышли из аккаунта', 'info');
+};
 
 // Функция для показа нативного уведомления
 const showNotification = (message, type = 'success') => {
@@ -189,6 +212,57 @@ const handleDebugLog = () => {};
 
 .user-info {
   margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  padding: 16px;
+  background-color: var(--tg-theme-secondary-bg-color, rgba(255, 255, 255, 0.06));
+  border-radius: 12px;
+  margin-top: 16px;
+}
+
+.user-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  overflow: hidden;
+  margin-right: 12px;
+}
+
+.user-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.user-details {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.logout-button {
+  display: flex;
+  align-items: center;
+  background-color: transparent;
+  color: var(--tg-theme-hint-color, #9e9e9e);
+  border: 1px solid var(--tg-theme-hint-color, #9e9e9e);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.logout-button:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.logout-icon {
+  width: 18px;
+  height: 18px;
+  margin-right: 6px;
+  fill: currentColor;
 }
 
 .section-title {
@@ -302,6 +376,10 @@ const handleDebugLog = () => {};
 
 .notification.error {
   background-color: #F44336;
+}
+
+.notification.info {
+  background-color: #2196F3;
 }
 
 .notification p {

@@ -18,6 +18,7 @@ model User {
   // Дополнительные поля
   photoUrl   String? 
   username   String?
+  telegramData String? @db.Text // JSON с данными из Telegram
   sessions   Session[]
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt

@@ -258,28 +258,60 @@ export const TelegramStorage = {
 export const getInitData = async () => {
   try {
     const webApp = getTelegramWebApp();
-    if (!webApp) return null;
+    if (!webApp) {
+      console.log('[TelegramUtils] getInitData: WebApp не доступен');
+      return null;
+    }
     
     // Проверка на наличие данных
     if (!webApp.initData && !webApp.initDataUnsafe) {
+      console.log('[TelegramUtils] getInitData: Отсутствуют данные initData и initDataUnsafe');
       return null;
     }
+    
+    // Логируем данные initDataUnsafe для отладки
+    console.log('[TelegramUtils] getInitData: initDataUnsafe доступен', 
+      webApp.initDataUnsafe ? 'true' : 'false', 
+      'Содержит auth_date:', webApp.initDataUnsafe?.auth_date ? 'true' : 'false',
+      'Содержит hash:', webApp.initDataUnsafe?.hash ? 'true' : 'false',
+      'Содержит user:', webApp.initDataUnsafe?.user ? 'true' : 'false'
+    );
     
     // Получаем данные пользователя
     const user = getTelegramUser();
     
     if (!user) {
+      console.log('[TelegramUtils] getInitData: Отсутствуют данные пользователя');
+      
+      // Для отладки - детальная информация о webApp.initDataUnsafe
+      if (webApp.initDataUnsafe && typeof webApp.initDataUnsafe === 'object') {
+        console.log('[TelegramUtils] getInitData: Доступные ключи в initDataUnsafe:', 
+          Object.keys(webApp.initDataUnsafe).join(', ')
+        );
+      }
+      
       return null;
     }
     
+    // Логируем данные пользователя для отладки
+    console.log('[TelegramUtils] getInitData: Данные пользователя получены:', 
+      'id:', user.id,
+      'username:', user.username || '(отсутствует)',
+      'first_name:', user.first_name || '(отсутствует)'
+    );
+    
     // Формируем результат
-    return {
+    const result = {
       user,
       authDate: webApp.initDataUnsafe?.auth_date || null,
       hash: webApp.initDataUnsafe?.hash || null,
       startParam: webApp.initDataUnsafe?.start_param || null
     };
+    
+    console.log('[TelegramUtils] getInitData: Успешно получены данные initData');
+    return result;
   } catch (error) {
+    console.error('[TelegramUtils] getInitData: Ошибка при получении данных:', error);
     return null;
   }
 }; 

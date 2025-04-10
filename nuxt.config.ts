@@ -50,7 +50,8 @@ export default defineNuxtConfig({
     public: {
       telegramBotToken: process.env.TELEGRAM_BOT_TOKEN || '',
       apiBaseUrl: process.env.API_BASE_URL || 'https://maxzer.ru',
-      isProduction: process.env.NODE_ENV === 'production'
+      isProduction: process.env.NODE_ENV === 'production',
+      apiUrl: process.env.API_URL || 'https://maxzer.ru'
     }
   },
   
