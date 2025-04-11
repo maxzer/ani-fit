@@ -4,7 +4,6 @@ import jwt from 'jsonwebtoken';
 
 interface JwtPayload {
   userId: number;
-  telegramId: string;
   iat?: number;
   exp?: number;
 }
@@ -67,12 +66,12 @@ const profileLimiter = new RateLimiter(10, 60000); // 10 попыток сохр
 // Защита от частых запросов авторизации
 export function rateLimitMiddleware(request: FastifyRequest, reply: FastifyReply, done: Function) {
   const ip = request.ip || 'unknown';
-  const path = request.routerPath;
+  const path = request.url;
   
   let limiterResult;
   
   // Выбираем лимитер в зависимости от маршрута
-  if (path === '/auth/telegram' || path === '/api/auth/raw') {
+  if (path === '/auth/login' || path === '/api/auth/login') {
     limiterResult = authLimiter.check(ip);
   } else if (path === '/auth/profile' || path === '/api/auth/profile') {
     limiterResult = profileLimiter.check(ip);
@@ -134,14 +133,6 @@ export function authMiddleware(prisma: PrismaClient) {
         });
       }
       
-      // Проверяем, что это не временный токен
-      if ('temp' in decoded) {
-        return reply.status(401).send({ 
-          success: false, 
-          error: 'Для доступа требуется постоянный токен' 
-        });
-      }
-      
       // Проверяем сессию в базе данных
       const session = await prisma.session.findFirst({
         where: {
@@ -178,6 +169,51 @@ export function authMiddleware(prisma: PrismaClient) {
   };
 }
 
+// Middleware для обновления токенов
+export async function refreshTokens(request: FastifyRequest, reply: FastifyReply, prisma: PrismaClient) {
+  try {
+    // Получаем refresh токен из cookie
+    const refreshToken = request.cookies.refreshToken;
+    
+    if (!refreshToken) {
+      return;
+    }
+    
+    // Проверяем refresh токен
+    const refreshSecret = process.env.JWT_REFRESH_SECRET || 'default_refresh_secret';
+    const payload = jwt.verify(refreshToken, refreshSecret) as { userId: number, tokenType?: string };
+    
+    // Проверяем, что это действительно refresh токен
+    if (!payload || !payload.userId || payload.tokenType !== 'refresh') {
+      return;
+    }
+    
+    // Проверяем, что токен есть в базе данных
+    const authRecord = await prisma.auth.findUnique({
+      where: { userId: payload.userId },
+      include: { user: true }
+    });
+    
+    if (!authRecord || authRecord.refreshToken !== refreshToken) {
+      return;
+    }
+    
+    // Генерируем новый access токен
+    const accessSecret = process.env.JWT_ACCESS_SECRET || 'default_access_secret';
+    const newAccessToken = jwt.sign(
+      { userId: payload.userId },
+      accessSecret,
+      { expiresIn: '15m' }
+    );
+    
+    // Возвращаем новый access токен
+    reply.header('X-New-Access-Token', newAccessToken);
+  } catch (error) {
+    // Если произошла ошибка при обновлении токена, просто продолжаем без обновления
+    console.error('Ошибка при обновлении токена:', error);
+  }
+}
+
 // Функция для регистрации middleware на определенные маршруты
 export function registerAuthMiddleware(fastify: FastifyInstance, prisma: PrismaClient, options = {}) {
   const middleware = authMiddleware(prisma);
@@ -185,7 +221,7 @@ export function registerAuthMiddleware(fastify: FastifyInstance, prisma: PrismaC
   // Сначала проверяем ограничения запросов для защищенных маршрутов
   fastify.addHook('preHandler', (request, reply, done) => {
     // Пропускаем middleware для публичных маршрутов
-    const path = request.routerPath;
+    const path = request.url;
     if (
       path === '/ping'
     ) {
@@ -195,9 +231,9 @@ export function registerAuthMiddleware(fastify: FastifyInstance, prisma: PrismaC
     
     // Проверяем ограничения запросов для маршрутов авторизации и профиля
     if (
-      path === '/auth/telegram' ||
+      path === '/auth/login' ||
       path === '/auth/profile' ||
-      path === '/api/auth/raw' ||
+      path === '/api/auth/login' ||
       path === '/api/auth/profile'
     ) {
       rateLimitMiddleware(request, reply, done);
@@ -206,5 +242,11 @@ export function registerAuthMiddleware(fastify: FastifyInstance, prisma: PrismaC
     
     // Для всех остальных маршрутов применяем middleware аутентификации
     middleware(request, reply, done);
+  });
+  
+  // Добавляем middleware для проверки и обновления токенов на каждый запрос
+  fastify.addHook('onRequest', async (request, reply) => {
+    // Обновляем токены при необходимости
+    await refreshTokens(request, reply, prisma);
   });
 } 

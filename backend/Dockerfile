@@ -6,19 +6,22 @@ WORKDIR /app
 # Установка зависимостей
 RUN apk add --no-cache openssl dos2unix
 
-# Копируем package.json и устанавливаем зависимости
+# Копируем только файлы package.json и package-lock.json сначала
 COPY package*.json ./
-COPY prisma ./prisma/
 
+# Устанавливаем зависимости
 RUN npm install
 
-# Копируем исходный код и скрипты
+# Копируем остальные файлы проекта
 COPY . .
 
 # Конвертируем скрипт в Unix формат и делаем исполняемым
-RUN dos2unix init.sh && chmod +x init.sh && ls -la init.sh
+RUN dos2unix init.sh && chmod +x init.sh
 
-# Сборка
+# Устанавливаем явно нужные зависимости
+RUN npm install @fastify/jwt @fastify/cookie @fastify/cors fastify dotenv
+
+# Собираем проект
 RUN npm run build
 
 EXPOSE 3001

@@ -1,10 +1,26 @@
+// import 'dotenv/config';
+// Используем программную инициализацию
+try {
+  require('dotenv').config();
+} catch (e) {
+  console.log('Dotenv не найден, используем переменные окружения как есть');
+}
+
+// Выводим токен бота
+console.log('====================');
+console.log('TELEGRAM BOT TOKEN:', process.env.TELEGRAM_BOT_TOKEN);
+console.log('====================');
+
 import fastify from 'fastify'
 import cors from '@fastify/cors'
 import { PrismaClient } from '@prisma/client'
 import { execSync } from 'child_process'
 import { google } from 'googleapis'
 import authController from './auth/auth.controller'
+import telegramAuthController from './auth/telegram.controller'
 import { registerAuthMiddleware } from './auth/auth.middleware'
+import jwt from '@fastify/jwt'
+import cookie from '@fastify/cookie'
 
 const MAX_RETRIES = 10;
 const RETRY_DELAY = 5000; // 5 секунд
@@ -79,16 +95,62 @@ async function bootstrap() {
   
   // CORS
   app.register(cors, {
-    origin: process.env.NODE_ENV === 'production' 
-      ? ['https://maxzer.ru', 'https://www.maxzer.ru'] 
-      : true,
+    origin: (origin, cb) => {
+      // Telegram WebApps могут загружаться с разных доменов
+      // t.me, web.telegram.org и т.д.
+      const allowedOrigins = [
+        'https://maxzer.ru', 
+        'https://www.maxzer.ru',
+        'https://t.me',
+        'https://web.telegram.org',
+        'https://telegram.org'
+      ];
+      
+      // В разработке разрешаем любой origin
+      if (!origin || process.env.NODE_ENV !== 'production') {
+        return cb(null, true);
+      }
+      
+      // В production проверяем, разрешен ли домен
+      // Для Telegram разрешаем любой поддомен
+      const isAllowed = allowedOrigins.some(allowed => {
+        return origin === allowed || origin.endsWith('.telegram.org') || origin.endsWith('.t.me');
+      });
+      
+      if (isAllowed) {
+        return cb(null, true);
+      }
+      
+      return cb(new Error('Not allowed by CORS'), false);
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    allowedHeaders: ['Content-Type', 'Authorization', 'accept']
+  });
+  
+  // Регистрация JWT плагина
+  await app.register(jwt, {
+    secret: process.env.JWT_ACCESS_SECRET || 'default_access_secret',
+    sign: {
+      expiresIn: '15m'
+    },
+    cookie: {
+      cookieName: 'refreshToken',
+      signed: false
+    }
+  });
+
+  // Регистрация cookie плагина
+  await app.register(cookie, {
+    hook: 'onRequest',
+    parseOptions: {}
   });
   
   // Регистрируем контроллер аутентификации
   await authController(app, prisma);
+  
+  // Регистрируем контроллер Telegram-аутентификации
+  await telegramAuthController(app, prisma);
   
   // Регистрируем middleware для защищенных маршрутов
   registerAuthMiddleware(app, prisma);
@@ -174,31 +236,6 @@ async function bootstrap() {
         error: 'Не удалось создать событие в календаре' 
       });
     }
-  });
-  
-  // Добавляем API прокси для совместимости с новыми путями
-  app.post('/api/auth', async (request, reply) => {
-    // Перенаправляем запрос на существующий обработчик /auth/telegram
-    await app.inject({
-      method: 'POST',
-      url: '/auth/telegram',
-      payload: JSON.stringify(request.body),
-      headers: request.headers
-    }).then(response => {
-      reply.code(response.statusCode).send(JSON.parse(response.payload));
-    });
-  });
-  
-  app.post('/api/profile', async (request, reply) => {
-    // Перенаправляем запрос на существующий обработчик /auth/profile
-    await app.inject({
-      method: 'POST',
-      url: '/auth/profile',
-      payload: JSON.stringify(request.body),
-      headers: request.headers
-    }).then(response => {
-      reply.code(response.statusCode).send(JSON.parse(response.payload));
-    });
   });
   
   try {

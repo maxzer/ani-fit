@@ -1,7 +1,6 @@
 {
   "name": "ani-fit",
   "private": true,
-  "type": "module",
   "scripts": {
     "build": "nuxt build",
     "dev": "nuxt dev",
@@ -11,9 +10,11 @@
     "start": "node .output/server/index.mjs"
   },
   "dependencies": {
+    "@fastify/jwt": "^9.1.0",
     "@popperjs/core": "^2.11.8",
     "axios": "^1.8.4",
-    "dotenv": "^16.4.7",
+    "dotenv": "^16.5.0",
+    "fastify": "^5.2.2",
     "googleapis": "^148.0.0",
     "nuxt": "^3.16.2",
     "v-calendar": "^3.1.2",

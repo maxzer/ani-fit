@@ -10,7 +10,6 @@ datasource db {
 
 model User {
   id         Int     @id @default(autoincrement())
-  telegramId String  @default("")
   firstName  String  @default("")
   lastName   String  @default("")
   email      String  @unique
@@ -18,12 +17,24 @@ model User {
   // Дополнительные поля
   photoUrl   String? 
   username   String?
-  telegramData String? @db.Text // JSON с данными из Telegram
+  telegramId String? @unique
+  auth       Auth?
   sessions   Session[]
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
   @@map("users")
+}
+
+model Auth {
+  id           Int      @id @default(autoincrement())
+  refreshToken String?
+  userId       Int      @unique
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("auth")
 }
 
 model Session {

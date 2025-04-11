@@ -1,5 +1,11 @@
 #!/bin/sh
 
+# Устанавливаем зависимости
+echo "Installing dependencies..."
+npm install
+# Явно устанавливаем зависимости Fastify
+npm install @fastify/jwt @fastify/cookie @fastify/cors fastify dotenv
+
 # Генерируем Prisma Client
 npx prisma generate
 

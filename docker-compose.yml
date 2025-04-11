@@ -47,7 +47,6 @@ services:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/ani_fit?schema=public
     volumes:
       - ./backend/prisma:/app/prisma
-      - backend_node_modules:/app/node_modules
     expose:
       - "3001"
     depends_on:
@@ -110,4 +109,5 @@ networks:
 
 volumes:
   postgres_data:
-  backend_node_modules:
+  # Можно закомментировать или удалить, так как мы не используем этот volume больше
+  # backend_node_modules:
