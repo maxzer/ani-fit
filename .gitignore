@@ -25,3 +25,4 @@ logs
 
 # SSL сертификаты
 nginx/ssl/
+.cursor
