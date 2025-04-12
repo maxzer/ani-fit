@@ -186,6 +186,25 @@ export default async function telegramAuthController(fastify: FastifyInstance, p
         try {
           tokens = authService.generateTokens(user);
           console.log('Generated tokens successfully');
+          
+          // Добавляем дополнительную проверку созданных токенов для отладки
+          try {
+            const accessSecret = process.env.JWT_ACCESS_SECRET || 'default_access_secret';
+            const accessToken = tokens.accessToken;
+            
+            // Проверяем, что токен можно верифицировать с правильным секретом
+            const decoded = jwt.verify(accessToken, accessSecret);
+            console.log('Успешная верификация access токена:', decoded);
+            
+            // Убеждаемся, что userId в токене соответствует ID пользователя
+            if ((decoded as any).userId !== user.id) {
+              console.error(`Ошибка в токене: ID пользователя не совпадает. В токене: ${(decoded as any).userId}, ожидается: ${user.id}`);
+            } else {
+              console.log('ID пользователя в токене корректен');
+            }
+          } catch (verifyError) {
+            console.error('Ошибка верификации созданного токена:', verifyError);
+          }
         } catch (tokenError) {
           console.error('Token generation error:', tokenError);
           throw tokenError;

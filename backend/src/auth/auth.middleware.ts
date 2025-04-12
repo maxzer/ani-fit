@@ -121,41 +121,33 @@ export function authMiddleware(prisma: PrismaClient) {
       }
       
       // Проверяем токен
-      const secret = process.env.JWT_SECRET || 'default_secret';
+      const secret = process.env.JWT_ACCESS_SECRET || 'default_access_secret';
       let decoded: JwtPayload;
       
       try {
         decoded = jwt.verify(token, secret) as JwtPayload;
       } catch (err) {
+        console.error('Ошибка валидации токена:', err);
         return reply.status(401).send({ 
           success: false, 
           error: 'Недействительный или истекший токен' 
         });
       }
       
-      // Проверяем сессию в базе данных
-      const session = await prisma.session.findFirst({
-        where: {
-          token,
-          userId: decoded.userId,
-          expiresAt: {
-            gt: new Date()
-          }
-        },
-        include: {
-          user: true
-        }
+      // Находим пользователя по userId из токена
+      const user = await prisma.user.findUnique({
+        where: { id: decoded.userId }
       });
       
-      if (!session) {
+      if (!user) {
         return reply.status(401).send({ 
           success: false, 
-          error: 'Сессия не найдена или устарела' 
+          error: 'Пользователь не найден' 
         });
       }
       
       // Добавляем данные пользователя в запрос
-      request.user = session.user;
+      request.user = user;
       
       // Продолжаем обработку запроса
       done();

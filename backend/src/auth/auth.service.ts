@@ -141,12 +141,24 @@ export class AuthService {
 
   generateTokens(user: User): TokenPair {
     try {
+      console.log(`Генерация токенов для пользователя ID: ${user.id}`);
+      
       // Создаем access token (короткий срок жизни)
       const accessToken = jwt.sign(
         { userId: user.id },
         this.accessSecret,
         { expiresIn: '15m' }
       );
+      
+      console.log(`Access token создан с секретом: ${this.accessSecret.substring(0, 5)}... и expiresIn: 15m`);
+      
+      // Для отладки - декодируем токен
+      try {
+        const decoded = jwt.decode(accessToken);
+        console.log(`Декодированный access token:`, decoded);
+      } catch (decodeError) {
+        console.error(`Ошибка декодирования токена для проверки:`, decodeError);
+      }
 
       // Создаем refresh token (длинный срок жизни)
       const refreshToken = jwt.sign(
@@ -154,9 +166,12 @@ export class AuthService {
         this.refreshSecret,
         { expiresIn: '7d' }
       );
+      
+      console.log(`Refresh token создан с секретом: ${this.refreshSecret.substring(0, 5)}... и expiresIn: 7d`);
 
       return { accessToken, refreshToken };
     } catch (error) {
+      console.error(`Ошибка генерации токенов:`, error);
       throw new TokenGenerationError(`Failed to generate tokens: ${(error as Error).message}`);
     }
   }

@@ -102,6 +102,8 @@ import { ref, computed, onMounted, watch } from 'vue';
 import 'v-calendar/style.css';
 import { fetchApi } from '../utils/api';
 import { useRuntimeConfig } from '#app';
+import { getTelegramTheme, isTelegramWebAppAvailable } from '~/utils/telegram';
+import axios from 'axios';
 
 const props = defineProps({
   color: {
@@ -262,6 +264,30 @@ watch(selectedDate, (newValue, oldValue) => {
 // Проверяем тему Telegram для адаптации стилей
 onMounted(() => {
   try {
+    // Инициализируем глобальную переменную authToken, если она не существует
+    if (typeof window !== 'undefined') {
+      // Пытаемся получить токен из разных источников
+      if (!window.authToken) {
+        // Пробуем получить токен из localStorage
+        try {
+          const storedToken = window.localStorage?.getItem('authToken');
+          if (storedToken) {
+            window.authToken = storedToken;
+          }
+        } catch (e) {
+          console.warn('Ошибка доступа к localStorage при инициализации authToken');
+        }
+        
+        // Проверяем axios.defaults если localStorage недоступен
+        if (!window.authToken && window.axios?.defaults?.headers?.common?.['Authorization']) {
+          const authHeader = window.axios.defaults.headers.common['Authorization'];
+          if (authHeader && authHeader.startsWith('Bearer ')) {
+            window.authToken = authHeader.substring(7);
+          }
+        }
+      }
+    }
+    
     // Устанавливаем текущую дату как активную
     const today = new Date();
     
@@ -401,6 +427,165 @@ const sendDebugLog = (message, type = 'info') => {
   emit('debug-log', { message, type });
 };
 
+// Функция для обновления токена авторизации
+const refreshAuthToken = async () => {
+  try {
+    sendDebugLog('Попытка обновления токена авторизации');
+    
+    // Проверка запуска в Telegram WebApp
+    const isTelegramEnv = typeof window !== 'undefined' && window.Telegram && window.Telegram.WebApp;
+    
+    if (isTelegramEnv) {
+      // Получаем initData из Telegram WebApp
+      const tgWebApp = window.Telegram.WebApp;
+      
+      if (!tgWebApp.initData) {
+        sendDebugLog('initData не доступен, невозможно обновить токен', 'error');
+        return null;
+      }
+      
+      sendDebugLog('Выполняем повторную авторизацию через Telegram WebApp');
+      
+      // Извлекаем информацию о пользователе и параметры из initData
+      const userData = tgWebApp.initDataUnsafe?.user || {};
+      
+      // Создаем запрос для повторной авторизации с проверкой времени и добавлением случайного nonce
+      const authRequest = {
+        initData: tgWebApp.initData,
+        telegram_data: userData,
+        client_time: new Date().toISOString(),
+        action: 'refresh_token',
+        nonce: Math.random().toString(36).substring(2, 15) // Добавляем случайное значение для предотвращения кеширования
+      };
+      
+      // Отправляем запрос на сервер с прямым использованием fetch
+      sendDebugLog('Отправка запроса на /api/auth/telegram для обновления токена');
+      const response = await fetch('/api/auth/telegram', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify(authRequest),
+        credentials: 'include' // Важно для получения cookies
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        sendDebugLog(`Ошибка при обновлении токена: ${response.status}, ${errorText}`, 'error');
+        throw new Error(`Ошибка при обновлении токена: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data && data.accessToken) {
+        const newToken = data.accessToken;
+        sendDebugLog(`Успешно получен новый токен через Telegram: ${newToken.substring(0, 15)}...`);
+        
+        // Сохраняем новый токен глобально
+        if (typeof window !== 'undefined') {
+          // Явно сохраняем токен в глобальную переменную
+          window.authToken = newToken;
+          
+          // Обновляем заголовки axios и других http клиентов
+          if (window.axios) {
+            window.axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+            sendDebugLog('Обновлен Authorization заголовок в axios');
+          }
+          
+          // Обновляем кэш запросов, если он используется
+          try {
+            if (window.caches) {
+              sendDebugLog('Попытка очистки кэша запросов');
+              window.caches.keys().then(names => {
+                names.forEach(name => {
+                  window.caches.delete(name);
+                });
+              });
+            }
+          } catch (cacheError) {
+            sendDebugLog(`Ошибка при очистке кэша: ${cacheError.message}`);
+          }
+          
+          try {
+            localStorage.setItem('authToken', newToken);
+            sendDebugLog('Токен сохранен в localStorage');
+          } catch (e) {
+            // Игнорируем ошибки localStorage
+            sendDebugLog('Не удалось сохранить в localStorage: ' + e.message);
+          }
+        }
+        
+        // Исправление: небольшая задержка перед возвратом нового токена
+        // чтобы убедиться, что изменения глобальных переменных применены
+        await new Promise(resolve => setTimeout(resolve, 50));
+        
+        return newToken;
+      } else {
+        sendDebugLog('Сервер вернул успешный ответ, но токен отсутствует в ответе', 'error');
+      }
+    } else {
+      // В обычной веб-среде используем стандартный запрос
+      sendDebugLog('Используем стандартный запрос для обновления токена');
+      const response = await fetch('/api/auth/refresh-token', {
+        method: 'POST',
+        credentials: 'include', // Включаем cookies для refresh токена
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'X-Requested-With': 'XMLHttpRequest'
+        }
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        sendDebugLog(`Ошибка при обновлении токена: ${response.status}, ${errorText}`, 'error');
+        throw new Error(`Ошибка при обновлении токена: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data && data.accessToken) {
+        const newToken = data.accessToken;
+        sendDebugLog(`Успешно получен новый токен: ${newToken.substring(0, 15)}...`);
+        
+        if (typeof window !== 'undefined') {
+          window.authToken = newToken;
+          
+          try {
+            localStorage.setItem('authToken', newToken);
+            
+            if (window.axios) {
+              window.axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+              sendDebugLog('Обновлен Authorization заголовок в axios');
+            }
+          } catch (e) {
+            // Игнорируем ошибки localStorage/axios
+            sendDebugLog('Не удалось обновить заголовки: ' + e.message);
+          }
+        }
+        
+        // Исправление: небольшая задержка перед возвратом нового токена
+        await new Promise(resolve => setTimeout(resolve, 50));
+        
+        return newToken;
+      } else {
+        sendDebugLog('Сервер вернул успешный ответ, но токен отсутствует в ответе', 'error');
+      }
+    }
+    
+    throw new Error('Не удалось получить новый токен');
+  } catch (error) {
+    sendDebugLog(`Ошибка обновления токена: ${error.message}`, 'error');
+    return null;
+  }
+};
+
 // Обновляем функцию confirmDate для использования локального значения породы
 const confirmDate = async () => {
   if (isSubmitted.value || isLoading.value) {
@@ -476,271 +661,312 @@ const confirmDate = async () => {
     
     sendDebugLog(`Отправка данных события: ${JSON.stringify(eventData).substring(0, 100)}...`);
     
-    // Функция для выполнения запроса с повторными попытками
-    const fetchWithRetry = async (url, options, retries = 3, delay = 1000) => {
-      try {
-        sendDebugLog(`Попытка запроса к ${url} (осталось попыток: ${retries})`);
-        const response = await fetch(url, options);
-        sendDebugLog(`Получен статус: ${response.status}`);
-        
-        if (!response.ok) {
-          const errorText = await response.text();
-          sendDebugLog(`Ошибка ответа: ${response.status}, текст: ${errorText}`, 'error');
-          throw new Error(`HTTP error! Status: ${response.status}, Body: ${errorText}`);
-        }
-        
-        return await response.json();
-      } catch (error) {
-        sendDebugLog(`Ошибка запроса: ${error.message}`, 'error');
-        if (error.message.includes('Failed to fetch')) {
-          sendDebugLog('Ошибка сетевого соединения или CORS', 'error');
-        }
-        
-        if (retries > 0) {
-          sendDebugLog(`Повторная попытка через ${delay}мс...`);
-          await new Promise(resolve => setTimeout(resolve, delay));
-          return fetchWithRetry(url, options, retries - 1, delay * 1.5);
-        }
-        
-        throw error;
-      }
-    };
-    
-    // Отправляем запрос к API для добавления события в календарь
-    let response;
-    
-    // Модифицируем подход к запросу в зависимости от окружения
-    if (isTelegramWebApp && window.telegramApiProxy) {
-      sendDebugLog('Использую Telegram API Proxy для запроса');
+    // В обычном веб-приложении используем fetchApi из utils
+    sendDebugLog('Использую fetchApi для веб-приложения');
+    try {
+      // Получаем токен авторизации из разных источников
+      let authToken = '';
       
-      try {
-        // Используем специальный прокси для Telegram WebApp
-        response = await window.telegramApiProxy.fetch('/api/calendar/add-event', {
-          method: 'POST',
-          body: JSON.stringify(eventData)
-        });
-        sendDebugLog(`Ответ API (через прокси): ${JSON.stringify(response).substring(0, 100)}...`);
-      } catch (proxyError) {
-        sendDebugLog(`Ошибка при использовании прокси: ${proxyError.message}`, 'error');
-        
-        // Запасной вариант - прямой запрос если прокси не сработал
-        sendDebugLog('Использую прямой fetch как запасной вариант');
-        const config = useRuntimeConfig();
-        const baseUrl = config.public.apiBaseUrl || 'https://maxzer.ru';
-        const url = `${baseUrl}/api/calendar/add-event`;
-        sendDebugLog(`URL запроса: ${url}`);
-        
+      // Проверяем разные источники для получения токена
+      if (typeof window !== 'undefined') {
+        // 1. Проверяем глобальный объект
+        if (window.authToken) {
+          authToken = window.authToken;
+        } 
+        // 2. Проверяем axios.defaults.headers
+        else if (window.axios && window.axios.defaults && 
+                 window.axios.defaults.headers.common['Authorization']) {
+          const authHeader = window.axios.defaults.headers.common['Authorization'];
+          if (authHeader && authHeader.startsWith('Bearer ')) {
+            authToken = authHeader.substring(7); // Убираем 'Bearer ' из начала
+          }
+        }
+        // 3. Пробуем localStorage как запасной вариант
+        else if (window.localStorage) {
+          try {
+            authToken = window.localStorage.getItem('authToken');
+          } catch (e) {
+            sendDebugLog('Ошибка доступа к localStorage', 'error');
+          }
+        }
+      }
+      
+      sendDebugLog(authToken ? 'Токен авторизации найден' : 'Токен авторизации не найден');
+      
+      // Ограничиваем количество попыток обновления токена
+      let tokenRefreshAttempts = 0;
+      const maxRefreshAttempts = 2;
+      
+      // Формируем базовый запрос
+      const requestOptions = {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
+        },
+        body: JSON.stringify(eventData)
+      };
+      
+      // Отладочное сообщение для проверки заголовков
+      sendDebugLog(`Заголовки запроса: ${JSON.stringify(requestOptions.headers)}`);
+      
+      // Проверяем корректность токена (базовая валидация JWT)
+      if (authToken) {
         try {
-          response = await fetchWithRetry(
-            url,
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'Origin': window.location.origin || 'https://t.me',
-                'X-Requested-With': 'XMLHttpRequest',
-                'X-Telegram-WebApp': '1',
-                'Cache-Control': 'no-cache, no-store, must-revalidate',
-                'Pragma': 'no-cache'
-              },
-              body: JSON.stringify(eventData),
-              mode: 'cors',
-              credentials: 'omit',
-              cache: 'no-store',
-              redirect: 'follow'
-            }
-          );
-          
-          sendDebugLog(`Ответ API (прямой fetch): ${JSON.stringify(response).substring(0, 100)}...`);
-        } catch (fetchError) {
-          // Если все попытки неудачны, пробуем с другим методом
-          sendDebugLog(`Все попытки fetch неудачны, пробуем альтернативный метод`, 'error');
-          
-          // Пробуем использовать XMLHttpRequest как альтернативу fetch
-          response = await new Promise((resolve, reject) => {
-            const xhr = new XMLHttpRequest();
-            xhr.open('POST', url, true);
-            xhr.setRequestHeader('Content-Type', 'application/json');
-            xhr.setRequestHeader('Accept', 'application/json');
-            xhr.setRequestHeader('X-Telegram-WebApp', '1');
-            xhr.setRequestHeader('Origin', window.location.origin || 'https://t.me');
+          // Проверяем структуру JWT токена (должен иметь 3 части разделенные точками)
+          const parts = authToken.split('.');
+          if (parts.length !== 3) {
+            sendDebugLog('Предупреждение: токен не соответствует формату JWT (должен иметь 3 части)', 'error');
+          } else {
+            sendDebugLog('Токен имеет корректный формат JWT');
             
-            xhr.onload = function() {
-              if (xhr.status >= 200 && xhr.status < 300) {
-                try {
-                  const jsonResponse = JSON.parse(xhr.responseText);
-                  sendDebugLog(`Ответ через XMLHttpRequest получен успешно`);
-                  resolve(jsonResponse);
-                } catch (e) {
-                  sendDebugLog(`Ошибка парсинга JSON: ${e.message}`, 'error');
-                  reject(new Error('Ошибка парсинга ответа'));
+            // Дополнительная проверка - пробуем декодировать JWT payload
+            try {
+              const payload = JSON.parse(atob(parts[1]));
+              const expTime = payload.exp ? new Date(payload.exp * 1000) : null;
+              if (expTime) {
+                const now = new Date();
+                const timeLeft = (expTime - now) / 1000;
+                sendDebugLog(`Токен действителен еще ${Math.round(timeLeft)} секунд`);
+                
+                if (timeLeft < 60) {
+                  sendDebugLog('Предупреждение: токен скоро истечет, возможно потребуется обновление', 'error');
                 }
-              } else {
-                sendDebugLog(`Ошибка XMLHttpRequest: ${xhr.status} ${xhr.statusText}`, 'error');
-                reject(new Error(`HTTP ошибка: ${xhr.status}`));
               }
-            };
-            
-            xhr.onerror = function() {
-              sendDebugLog(`Сетевая ошибка XMLHttpRequest`, 'error');
-              reject(new Error('Сетевая ошибка'));
-            };
-            
-            xhr.send(JSON.stringify(eventData));
-            sendDebugLog('Запрос отправлен через XMLHttpRequest');
-          });
+            } catch (e) {
+              sendDebugLog(`Не удалось декодировать payload токена: ${e.message}`, 'error');
+            }
+          }
+        } catch (e) {
+          sendDebugLog(`Ошибка при анализе токена: ${e.message}`, 'error');
         }
       }
-    } else if (isTelegramWebApp) {
-      // Прямой запрос если телеграм, но прокси не инициализирован
-      sendDebugLog('Использую прямой fetch запрос для Telegram WebApp');
-      const config = useRuntimeConfig();
-      const baseUrl = config.public.apiBaseUrl || 'https://maxzer.ru';
-      const url = `${baseUrl}/api/calendar/add-event`;
-      sendDebugLog(`Отправка запроса на URL: ${url}`);
       
+      // Функция для выполнения запроса с текущими параметрами
+      const executeRequest = async (options) => {
+        try {
+          // Важно: при каждом запросе проверяем актуальный токен
+          if (typeof window !== 'undefined' && window.authToken) {
+            // Всегда используем самый свежий токен из глобальной переменной
+            options.headers = {
+              ...options.headers,
+              'Authorization': `Bearer ${window.authToken}`
+            };
+            sendDebugLog(`Использую глобальный токен для запроса (${window.authToken.substring(0, 15)}...)`);
+          }
+          
+          // Пробуем сначала прямой fetch как самый надежный метод
+          try {
+            sendDebugLog('Отправка запроса через прямой fetch');
+            
+            // Создаем абсолютный URL
+            const config = useRuntimeConfig();
+            const baseUrl = config.public.apiBaseUrl || 'https://maxzer.ru';
+            const url = `${baseUrl}/api/calendar/add-event`;
+            
+            // Добавляем полную информацию для отладки
+            sendDebugLog(`URL: ${url}`);
+            sendDebugLog(`Метод: ${options.method}`);
+            sendDebugLog(`Заголовки: ${JSON.stringify(options.headers)}`);
+            
+            // Пробуем отправить запрос напрямую
+            const directResponse = await fetch(url, {
+              method: options.method,
+              headers: {
+                ...options.headers,
+                'X-Direct-Request': 'true' // Маркер для серверной отладки
+              },
+              body: options.body,
+              credentials: 'include'
+            });
+            
+            sendDebugLog(`Статус прямого запроса: ${directResponse.status}`);
+            
+            // Если статус не 401, то возвращаем результат
+            if (directResponse.status !== 401) {
+              const jsonResponse = await directResponse.json();
+              sendDebugLog(`Успешный ответ прямого запроса: ${JSON.stringify(jsonResponse).substring(0, 100)}...`);
+              return jsonResponse;
+            }
+            
+            // Если получили 401, выводим дополнительную информацию
+            const errorText = await directResponse.text();
+            sendDebugLog(`Ошибка прямого запроса (401): ${errorText}`, 'error');
+            
+            // Пробуем запасной вариант через fetchApi
+            sendDebugLog('Первый запрос не удался, пробуем через fetchApi');
+          } catch (directError) {
+            sendDebugLog(`Ошибка прямого запроса: ${directError.message}`, 'error');
+          }
+          
+          // Запасной вариант через fetchApi
+          return await fetchApi('/api/calendar/add-event', options);
+        } catch (error) {
+          // Проверяем, является ли ошибка 401 Unauthorized
+          if (error.message.includes('401')) {
+            sendDebugLog(`Получена ошибка 401: ${error.message}`);
+            return { status: 401, error: error.message };
+          }
+          throw error;
+        }
+      };
+      
+      // Делаем первый запрос
+      let response;
       try {
-        response = await fetchWithRetry(
-          url,
-          {
-            method: 'POST',
-            headers: {
+        response = await executeRequest(requestOptions);
+        
+        // Отладочная информация о результате запроса
+        if (response.status === 401) {
+          sendDebugLog(`Получен статус 401, тело ответа: ${JSON.stringify(response.error || 'Нет деталей')}`);
+        } else {
+          sendDebugLog(`Ответ API, статус: ${response.status || 'OK'}, сообщение: ${JSON.stringify(response.message || '')}`);
+        }
+      } catch (initialError) {
+        sendDebugLog(`Ошибка при выполнении первичного запроса: ${initialError.message}`, 'error');
+        // Устанавливаем response на объект ошибки для дальнейшей обработки
+        response = { status: 500, error: initialError.message };
+      }
+      
+      // Если получили ошибку 401, пробуем обновить токен и повторить запрос
+      if (response.status === 401) {
+        while (tokenRefreshAttempts < maxRefreshAttempts) {
+          sendDebugLog(`Получена ошибка 401, пробуем обновить токен (попытка ${tokenRefreshAttempts + 1})`);
+          tokenRefreshAttempts++;
+          
+          // Пробуем обновить токен
+          const newToken = await refreshAuthToken();
+          
+          if (!newToken) {
+            sendDebugLog('Не удалось получить новый токен', 'error');
+            break;
+          }
+          
+          sendDebugLog(`Токен обновлен до: ${newToken.substring(0, 15)}..., повторяем запрос`);
+          
+          // Попробуем сделать прямой запрос минуя любые абстракции
+          try {
+            sendDebugLog('Отправка прямого запроса с обновленным токеном (без fetchApi)');
+            
+            const config = useRuntimeConfig();
+            const baseUrl = config.public.apiBaseUrl || 'https://maxzer.ru';
+            const url = `${baseUrl}/api/calendar/add-event`;
+            
+            // Создаем новые заголовки с гарантированно свежим токеном
+            const freshHeaders = {
               'Content-Type': 'application/json',
               'Accept': 'application/json',
-              'Origin': window.location.origin || 'https://t.me',
-              'X-Requested-With': 'XMLHttpRequest',
-              'X-Telegram-WebApp': '1',
+              'Authorization': `Bearer ${newToken}`,
+              'X-Retry-Attempt': `${tokenRefreshAttempts}`,
               'Cache-Control': 'no-cache, no-store, must-revalidate',
               'Pragma': 'no-cache'
-            },
-            body: JSON.stringify(eventData),
-            mode: 'cors',
-            credentials: 'omit',
-            cache: 'no-store'
-          }
-        );
-      } catch (fetchError) {
-        sendDebugLog(`Все попытки fetch неудачны, пробуем через iframe передачу`, 'error');
-        
-        // Экстренный вариант - создаем временный iframe и отправляем через него
-        response = await new Promise((resolve, reject) => {
-          try {
-            const iframe = document.createElement('iframe');
-            iframe.style.display = 'none';
-            document.body.appendChild(iframe);
+            };
             
-            // Создаем уникальный ID для сообщения
-            const messageId = `event_${Date.now()}`;
+            sendDebugLog(`Отправка запроса на: ${url}`);
+            sendDebugLog(`Заголовки запроса: ${JSON.stringify(freshHeaders)}`);
             
-            // Обработчик сообщений от iframe
-            const messageHandler = (event) => {
-              if (event.data && event.data.messageId === messageId) {
-                sendDebugLog(`Получен ответ через iframe: ${JSON.stringify(event.data).substring(0, 100)}...`);
-                window.removeEventListener('message', messageHandler);
-                document.body.removeChild(iframe);
-                
-                if (event.data.error) {
-                  reject(new Error(event.data.error));
-                } else {
-                  resolve(event.data.response);
-                }
+            // Отправляем запрос с полным контролем
+            const directResponse = await fetch(url, {
+              method: 'POST',
+              headers: freshHeaders,
+              body: JSON.stringify(eventData),
+              credentials: 'include',
+              mode: 'cors',
+              cache: 'no-store'
+            });
+            
+            sendDebugLog(`Статус ответа прямого запроса: ${directResponse.status}`);
+            
+            if (directResponse.ok) {
+              // Преобразуем ответ в JSON
+              const jsonResponse = await directResponse.json();
+              sendDebugLog(`Успешный ответ: ${JSON.stringify(jsonResponse).substring(0, 100)}...`);
+              
+              // Возвращаем данные и выходим из цикла
+              response = jsonResponse;
+              break;
+            } else if (directResponse.status === 401) {
+              const errorText = await directResponse.text();
+              sendDebugLog(`Ошибка авторизации (401) даже с новым токеном: ${errorText}`, 'error');
+              sendDebugLog('Запрос с новым токеном все равно вернул 401, возможно проблема на сервере', 'error');
+              
+              // Сохраняем текущий ответ для продолжения цикла
+              response = { status: 401, error: errorText || 'Unauthorized' };
+            } else {
+              // Другая ошибка, пробуем распарсить ответ
+              const errorText = await directResponse.text();
+              sendDebugLog(`Ошибка запроса: ${directResponse.status}, ${errorText}`, 'error');
+              
+              // Прерываем цикл, так как получили определенную ошибку не связанную с авторизацией
+              response = { 
+                status: directResponse.status, 
+                error: errorText || `HTTP error ${directResponse.status}` 
+              };
+              break;
+            }
+          } catch (directError) {
+            sendDebugLog(`Ошибка при прямом запросе: ${directError.message}`, 'error');
+            
+            // Пробуем запасной вариант через fetchApi с обновленным токеном
+            const newOptions = {
+              ...requestOptions,
+              headers: {
+                ...requestOptions.headers,
+                'Authorization': `Bearer ${newToken}`,
+                'X-Retry-Attempt': `${tokenRefreshAttempts}`
               }
             };
             
-            // Регистрируем обработчик сообщений
-            window.addEventListener('message', messageHandler);
-            
-            // Создаем контент для iframe программно, без использования шаблонных строк
-            const scriptContent = `
-                const messageId = "${messageId}";
-                const eventData = ${JSON.stringify(eventData)};
-                const url = "${url}";
-                
-                async function sendRequest() {
-                  try {
-                    const response = await fetch(url, {
-                      method: 'POST',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                      },
-                      body: JSON.stringify(eventData)
-                    });
-                    
-                    const data = await response.json();
-                    window.parent.postMessage({ messageId, response: data }, "*");
-                  } catch (error) {
-                    window.parent.postMessage({ messageId, error: error.message }, "*");
-                  }
-                }
-                
-                window.onload = sendRequest;
-            `;
-            
-            // Создаем HTML программно без шаблонных строк
-            const html = document.createElement('html');
-            const head = document.createElement('head');
-            const script = document.createElement('script');
-            script.textContent = scriptContent;
-            head.appendChild(script);
-            
-            const body = document.createElement('body');
-            body.textContent = 'Отправка запроса...';
-            
-            html.appendChild(head);
-            html.appendChild(body);
-            
-            const doctype = '<!DOCTYPE html>';
-            const iframeContent = doctype + html.outerHTML;
-            
-            // Загружаем контент в iframe
-            iframe.srcdoc = iframeContent;
-            sendDebugLog('Запрос отправлен через iframe');
-          } catch (iframeError) {
-            sendDebugLog(`Ошибка при отправке через iframe: ${iframeError.message}`, 'error');
-            reject(iframeError);
+            try {
+              response = await executeRequest(newOptions);
+              
+              // Если успешно, выходим из цикла
+              if (!response.status || response.status !== 401) {
+                sendDebugLog('Запрос успешно выполнен с новым токеном через fetchApi!');
+                break;
+              } else {
+                sendDebugLog('Запрос с новым токеном через fetchApi все равно вернул 401', 'error');
+              }
+            } catch (apiError) {
+              sendDebugLog(`Ошибка при запросе через fetchApi: ${apiError.message}`, 'error');
+              // Продолжаем цикл
+            }
           }
-        });
+        }
       }
-    } else {
-      // В обычном веб-приложении используем fetchApi из utils
-      sendDebugLog('Использую fetchApi для веб-приложения');
-      try {
-        response = await fetchApi('/api/calendar/add-event', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(eventData)
-        });
-        sendDebugLog(`Ответ API (fetchApi): ${JSON.stringify(response).substring(0, 100)}...`);
-      } catch (fetchError) {
-        sendDebugLog(`Ошибка fetchApi: ${fetchError.stack || fetchError.message}`, 'error');
-        throw fetchError;
+      
+      // Проверяем ответ после всех попыток
+      if (response.status === 401) {
+        throw new Error('Не удалось авторизоваться после всех попыток обновления токена');
       }
-    }
-    
-    if (response.success) {
-      sendDebugLog('Событие успешно создано!');
-      isSubmitted.value = true;
-      // Сообщаем родительскому компоненту об успешном подтверждении с правильной датой
-      emit('confirmed', { 
-        date: startDateTimeISO,
-        title: props.serviceName,
-        color: props.color,
-        staffInfo: props.staffInfo,
-        petBreed: breedValue.value // Используем локальное значение породы
-      });
-    } else {
-      sendDebugLog(`Ошибка при создании события: ${response.error}`, 'error');
-      emit('confirmed', { 
-        date: startDateTimeISO,
-        title: props.serviceName,
-        color: props.color,
-        staffInfo: props.staffInfo,
-        petBreed: breedValue.value // Используем локальное значение породы
-      }, null, response.error || 'Ошибка при создании события');
+      
+      sendDebugLog(`Ответ API (fetchApi): ${JSON.stringify(response).substring(0, 100)}...`);
+      
+      if (response.success) {
+        sendDebugLog('Событие успешно создано!');
+        isSubmitted.value = true;
+        // Сообщаем родительскому компоненту об успешном подтверждении с правильной датой
+        emit('confirmed', { 
+          date: startDateTimeISO,
+          title: props.serviceName,
+          color: props.color,
+          staffInfo: props.staffInfo,
+          petBreed: breedValue.value // Используем локальное значение породы
+        });
+      } else {
+        sendDebugLog(`Ошибка при создании события: ${response.error}`, 'error');
+        emit('confirmed', { 
+          date: startDateTimeISO,
+          title: props.serviceName,
+          color: props.color,
+          staffInfo: props.staffInfo,
+          petBreed: breedValue.value // Используем локальное значение породы
+        }, null, response.error || 'Ошибка при создании события');
+      }
+    } catch (fetchError) {
+      sendDebugLog(`Ошибка fetchApi: ${fetchError.stack || fetchError.message}`, 'error');
+      throw fetchError;
     }
   } catch (error) {
     sendDebugLog(`Ошибка при подтверждении даты: ${error.stack || error.message}`, 'error');

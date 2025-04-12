@@ -154,7 +154,11 @@ async function bootstrap() {
   
   // Регистрируем middleware для защищенных маршрутов ПОСЛЕ контроллеров аутентификации
   registerAuthMiddleware(app, prisma, {
-    excludePaths: ['/api/auth/telegram', '/api/auth/check-user'] // Исключаем пути авторизации из проверки
+    excludePaths: [
+      '/api/auth/telegram', 
+      '/api/auth/check-user',
+      '/api/auth/refresh-token'  // Добавляем путь обновления токена в исключения
+    ] // Исключаем пути авторизации из проверки
   });
   
   // Настройка Google Calendar
