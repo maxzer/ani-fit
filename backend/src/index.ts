@@ -210,6 +210,10 @@ async function bootstrap() {
       const startDateTime = body.startDateTime;
       const endDateTime = body.endDateTime;
       const attendees = body.attendees || [];
+      const color = body.color || '#4caf50';
+      
+      // Преобразование hex-цвета в идентификатор цвета Google Calendar
+      const colorId = getGoogleCalendarColorId(color);
       
       const event = {
         summary,
@@ -223,6 +227,7 @@ async function bootstrap() {
           timeZone: 'Europe/Moscow',
         },
         attendees,
+        colorId
       };
       
       const result = await calendar.events.insert({
@@ -243,6 +248,34 @@ async function bootstrap() {
       });
     }
   });
+  
+  // Функция для преобразования hex-цвета в идентификатор цвета Google Calendar
+  function getGoogleCalendarColorId(hexColor: string): string {
+    // Google Calendar поддерживает ограниченный набор цветов с ID от 1 до 11
+    // Сопоставим наши hex-цвета с ближайшими цветами в Google Calendar
+    
+    // Убираем # из начала цвета, если есть
+    const colorHex = hexColor.startsWith('#') ? hexColor.substring(1) : hexColor;
+    
+    // Сопоставление hex-цветов с ID цветов Google Calendar
+    const colorMap: { [key: string]: string } = {
+      '4caf50': '10', // Зелёный
+      '2196f3': '7',  // Синий
+      'ff9800': '6',  // Оранжевый
+      '9c27b0': '3',  // Фиолетовый
+      'f44336': '11', // Красный
+      'ffeb3b': '5',  // Жёлтый
+      'ffffff': '1',  // Светло-синий (по умолчанию)
+    };
+    
+    // Ищем точное совпадение
+    if (colorMap[colorHex]) {
+      return colorMap[colorHex];
+    }
+    
+    // Если точного совпадения нет, используем базовый цвет по умолчанию
+    return '1';
+  }
   
   // API для сохранения события в базу данных
   app.post('/api/events', async (request, reply) => {

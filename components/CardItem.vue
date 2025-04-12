@@ -108,7 +108,6 @@ const closePopup = () => {
   position: relative;
   height: 100%;
   padding: 4px;
-  animation: card-pulse 3s ease-in-out infinite alternate;
 }
 
 .card-item {
@@ -126,7 +125,7 @@ const closePopup = () => {
 }
 
 .card-image {
-  height: 180px;
+  height: 150px;
   background-size: cover;
   background-position: center;
   position: relative;
@@ -140,7 +139,7 @@ const closePopup = () => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(45deg, rgba(0, 0, 0, 0.2), transparent);
+  background: linear-gradient(45deg, rgba(0, 0, 0, 0.3), transparent);
   z-index: 1;
 }
 
@@ -160,10 +159,10 @@ const closePopup = () => {
   justify-content: center;
   width: 100%;
   height: 100%;
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
   font-size: 48px;
   font-weight: bold;
   color: #9e9e9e;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.1) 100%);
 }
 
 .card-content {
@@ -172,14 +171,29 @@ const closePopup = () => {
   display: flex;
   flex-direction: column;
   background-color: var(--tg-theme-bg-color, #ffffff);
+  position: relative;
+  z-index: 2;
 }
 
 .card-title {
   margin: 0 0 8px 0;
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 700;
   color: var(--tg-theme-text-color, #333333);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  position: relative;
+  display: inline-block;
+}
+
+.card-title::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -3px;
+  width: 40px;
+  height: 3px;
+  border-radius: 1.5px;
+  background-color: currentColor;
+  opacity: 0.5;
 }
 
 .card-description {
@@ -210,5 +224,23 @@ const closePopup = () => {
 .card-date svg {
   flex-shrink: 0;
   color: currentColor;
+}
+
+@media (max-width: 600px) {
+  .card-image {
+    height: 130px;
+  }
+  
+  .card-content {
+    padding: 15px;
+  }
+  
+  .card-title {
+    font-size: 16px;
+  }
+  
+  .card-description {
+    font-size: 13px;
+  }
 }
 </style> 

@@ -471,11 +471,6 @@ const getStaffName = (staffInfo) => {
   border-radius: 8px;
   cursor: pointer;
   font-size: 14px;
-  transition: background-color 0.2s;
-}
-
-.logout-button:hover {
-  background-color: rgba(255, 255, 255, 0.05);
 }
 
 .logout-icon {
@@ -485,23 +480,36 @@ const getStaffName = (staffInfo) => {
 }
 
 .section-title {
-  font-size: 18px;
-  font-weight: 600;
+  font-size: 20px;
+  font-weight: 700;
   margin: 24px 0 16px;
   color: var(--tg-theme-text-color, #ffffff);
   display: flex;
   align-items: center;
+  position: relative;
 }
 
 .card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  grid-template-columns: repeat(2, 1fr);
   gap: 16px;
   margin-bottom: 24px;
 }
 
 .scheduled-events {
   margin-top: 32px;
+  background-color: var(--tg-theme-secondary-bg-color, rgba(255, 255, 255, 0.06));
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.scheduled-events .section-title {
+  margin-top: 0;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .events-list {
@@ -511,32 +519,35 @@ const getStaffName = (staffInfo) => {
 }
 
 .event-item {
-  background-color: var(--tg-theme-secondary-bg-color, rgba(255, 255, 255, 0.06));
+  background-color: var(--tg-theme-bg-color, rgba(255, 255, 255, 0.04));
   border-radius: 12px;
   padding: 16px;
   display: flex;
   align-items: flex-start;
-  transition: all 0.2s ease;
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .event-cancelled {
-  opacity: 0.5;
+  opacity: 0.6;
 }
 
 .event-icon {
-  width: 40px;
-  height: 40px;
-  min-width: 40px;
-  border-radius: 8px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-right: 12px;
+  margin-right: 14px;
+  background-image: linear-gradient(45deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.01));
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .event-icon svg {
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
 }
 
 .event-info {
@@ -551,31 +562,32 @@ const getStaffName = (staffInfo) => {
 }
 
 .event-title {
-  font-weight: 600;
+  font-weight: 700;
   color: var(--tg-theme-text-color, #ffffff);
   font-size: 16px;
+  margin-bottom: 2px;
 }
 
 .event-status {
-  padding: 2px 8px;
+  padding: 3px 8px;
   font-size: 12px;
   font-weight: 600;
-  border-radius: 4px;
+  border-radius: 6px;
 }
 
 .status-confirmed {
-  background-color: rgba(76, 175, 80, 0.1);
-  color: #4caf50;
+  background-color: rgba(76, 175, 80, 0.15);
+  color: #62d866;
 }
 
 .status-pending {
-  background-color: rgba(255, 152, 0, 0.1);
-  color: #ff9800;
+  background-color: rgba(255, 152, 0, 0.15);
+  color: #ffac33;
 }
 
 .status-cancelled {
-  background-color: rgba(244, 67, 54, 0.1);
-  color: #f44336;
+  background-color: rgba(244, 67, 54, 0.15);
+  color: #ff6c5c;
 }
 
 .event-datetime {
@@ -598,7 +610,20 @@ const getStaffName = (staffInfo) => {
 .event-staff, .event-breed {
   color: var(--tg-theme-hint-color, #9e9e9e);
   font-size: 13px;
-  margin-top: 4px;
+  margin-top: 5px;
+  display: flex;
+  align-items: center;
+}
+
+.event-staff:before, .event-breed:before {
+  content: '';
+  display: inline-block;
+  width: 4px;
+  height: 4px;
+  background-color: currentColor;
+  border-radius: 50%;
+  margin-right: 6px;
+  opacity: 0.6;
 }
 
 .cancel-event-button {
@@ -606,22 +631,17 @@ const getStaffName = (staffInfo) => {
   border: none;
   color: var(--tg-theme-hint-color, #9e9e9e);
   cursor: pointer;
-  padding: 4px;
-  border-radius: 4px;
-  transition: all 0.2s ease;
+  padding: 6px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
+  opacity: 0.7;
 }
 
-.cancel-event-button:hover {
-  background-color: rgba(244, 67, 54, 0.1);
-  color: #f44336;
-}
-
-.cancel-event-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.cancel-event-button svg {
+  width: 16px;
+  height: 16px;
 }
 
 .notification {
@@ -629,8 +649,8 @@ const getStaffName = (staffInfo) => {
   bottom: 20px;
   left: 50%;
   transform: translateX(-50%);
-  padding: 12px 20px;
-  border-radius: 12px;
+  padding: 14px 20px;
+  border-radius: 16px;
   color: white;
   max-width: 90%;
   width: auto;
@@ -638,25 +658,31 @@ const getStaffName = (staffInfo) => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.25);
   animation: notification-slide-up 0.3s ease forwards;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .notification p {
   margin: 0;
   flex: 1;
+  font-weight: 500;
 }
 
 .notification.success {
-  background-color: #4caf50;
+  background-color: rgba(76, 175, 80, 0.85);
+  border: 1px solid rgba(76, 175, 80, 0.2);
 }
 
 .notification.error {
-  background-color: #f44336;
+  background-color: rgba(244, 67, 54, 0.85);
+  border: 1px solid rgba(244, 67, 54, 0.2);
 }
 
 .notification.info {
-  background-color: #2196f3;
+  background-color: rgba(33, 150, 243, 0.85);
+  border: 1px solid rgba(33, 150, 243, 0.2);
 }
 
 .notification-close {
@@ -665,8 +691,10 @@ const getStaffName = (staffInfo) => {
   color: white;
   margin-left: 12px;
   cursor: pointer;
-  padding: 4px;
+  padding: 6px;
   display: flex;
+  opacity: 0.8;
+  border-radius: 50%;
 }
 
 .loading-indicator {
@@ -714,7 +742,8 @@ const getStaffName = (staffInfo) => {
 
 @media (max-width: 600px) {
   .card-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
   }
 }
 </style>
