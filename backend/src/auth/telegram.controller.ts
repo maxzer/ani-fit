@@ -31,9 +31,17 @@ export default async function telegramAuthController(fastify: FastifyInstance, p
         }
       }
     },
+    config: {
+      cors: {
+        origin: ['https://maxzer.ru', 'https://www.maxzer.ru', 'http://localhost:3000'],
+        credentials: true
+      }
+    },
     handler: async (request, reply) => {
       try {
         console.log('===== TELEGRAM AUTH ENDPOINT START =====');
+        console.log('Request headers:', request.headers);
+        console.log('Request body:', request.body);
         console.log('RECEIVED INIT DATA:', request.body.initData);
         console.log('======================================');
         

@@ -152,8 +152,10 @@ async function bootstrap() {
   // Регистрируем контроллер Telegram-аутентификации
   await telegramAuthController(app, prisma);
   
-  // Регистрируем middleware для защищенных маршрутов
-  registerAuthMiddleware(app, prisma);
+  // Регистрируем middleware для защищенных маршрутов ПОСЛЕ контроллеров аутентификации
+  registerAuthMiddleware(app, prisma, {
+    excludePaths: ['/api/auth/telegram'] // Исключаем путь авторизации из проверки
+  });
   
   // Настройка Google Calendar
   const { jwtClient, calendar } = setupGoogleCalendar();

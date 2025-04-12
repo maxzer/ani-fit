@@ -7,15 +7,24 @@ import { createHmac } from 'crypto';
  * Проверяет подпись initData из Telegram WebApp
  * @param initData Строка initData из Telegram WebApp
  * @param botToken Токен бота Telegram
- * @returns true если подпись верна, иначе false
+ * @param maxAgeSeconds Максимальное время актуальности данных в секундах (по умолчанию 24 часа)
+ * @returns true если подпись верна и данные актуальны, иначе false
  */
-export function verifyTelegramWebAppData(initData: string, botToken: string): boolean {
+export function verifyTelegramWebAppData(initData: string, botToken: string, maxAgeSeconds: number = 86400): boolean {
   try {
     // Разбор данных initData
     const params = new URLSearchParams(initData);
     const hash = params.get('hash');
+    const authDate = params.get('auth_date');
     
-    if (!hash) {
+    if (!hash || !authDate) {
+      return false;
+    }
+
+    // Проверка времени актуальности
+    const currentTime = Math.floor(Date.now() / 1000);
+    const authTime = parseInt(authDate, 10);
+    if (isNaN(authTime) || (currentTime - authTime) > maxAgeSeconds) {
       return false;
     }
     

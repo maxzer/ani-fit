@@ -444,9 +444,16 @@ async function handleLogin() {
       throw new Error('Отсутствуют обязательные поля для авторизации');
     }
     
+    // Проверяем наличие initData
+    if (!rawInitData) {
+      addDebugLog('ОШИБКА: initData отсутствует');
+      throw new Error('initData отсутствует');
+    }
+    console.log('rawInitData:11111111111111111111111111111111111111111111111111111111111', rawInitData);
+    
     // Формируем данные для отправки на сервер
     const authRequest = {
-      raw_data: rawInitData || "missing_raw_data",
+      initData: rawInitData,
       telegram_data: telegramData,
       client_time: new Date().toISOString(),
       source: 'telegram_api_approach',
@@ -458,13 +465,15 @@ async function handleLogin() {
         telegramAvailable: !!window.Telegram?.WebApp
       }
     };
+
+    console.log('authRequest:11111111111111111111111111111111111111111111111111111111111', authRequest);
     
     // Записываем данные запроса для отладки
     networkDetails.value.request = authRequest;
     
     // Отправляем запрос на новый эндпоинт API (telegram-api)
     addDebugLog('Отправляем запрос на авторизацию через Telegram API...');
-    const response = await axios.post(`${apiUrl}/api/auth/telegram-api`, authRequest);
+    const response = await axios.post(`${apiUrl}/api/auth/telegram`, authRequest);
     
     // Обрабатываем ответ
     networkDetails.value.response = response.data;

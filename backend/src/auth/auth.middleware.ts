@@ -214,8 +214,13 @@ export async function refreshTokens(request: FastifyRequest, reply: FastifyReply
   }
 }
 
-// Функция для регистрации middleware на определенные маршруты
-export function registerAuthMiddleware(fastify: FastifyInstance, prisma: PrismaClient, options = {}) {
+interface AuthMiddlewareOptions {
+  excludePaths?: string[];
+}
+
+export function registerAuthMiddleware(fastify: FastifyInstance, prisma: PrismaClient, options: AuthMiddlewareOptions = {}) {
+  const { excludePaths = [] } = options;
+
   const middleware = authMiddleware(prisma);
   
   // Сначала проверяем ограничения запросов для защищенных маршрутов
@@ -240,13 +245,28 @@ export function registerAuthMiddleware(fastify: FastifyInstance, prisma: PrismaC
       return;
     }
     
+    // Пропускаем исключенные пути
+    if (excludePaths.includes(path)) {
+      done();
+      return;
+    }
+    
     // Для всех остальных маршрутов применяем middleware аутентификации
     middleware(request, reply, done);
   });
   
   // Добавляем middleware для проверки и обновления токенов на каждый запрос
   fastify.addHook('onRequest', async (request, reply) => {
-    // Обновляем токены при необходимости
-    await refreshTokens(request, reply, prisma);
+    // Пропускаем исключенные пути
+    if (excludePaths.includes(request.routerPath)) {
+      return;
+    }
+
+    try {
+      // Проверяем авторизацию
+      await request.jwtVerify();
+    } catch (err) {
+      reply.code(401).send({ success: false, error: 'Требуется авторизация' });
+    }
   });
 } 
