@@ -15,6 +15,7 @@
       :is24hr="true"
       :disabled-nav-directions="['left', 'right']"
       :is-popover-visible="false"
+      :min-date="new Date()"
     />
     
     <!-- Кастомный выбор времени -->
@@ -47,17 +48,6 @@
         <span>Просмотрите прайс-лист перед записью</span>
       </div>
     </div>
-    
-    <!-- Кнопка подтверждения -->
-    <button 
-      v-if="showConfirmButton" 
-      @click="confirmSelectedDate" 
-      class="confirm-button" 
-      :disabled="!selectedTimeSlot || disabled"
-      :style="{ backgroundColor: disabled ? '#cccccc' : color }"
-    >
-      Подтвердить {{ selectedTimeSlot ? formatDisplayTime(selectedTimeSlot) : '' }}
-    </button>
   </div>
 </template>
 
@@ -70,6 +60,9 @@ import { getTelegramTheme, isTelegramWebAppAvailable } from '~/utils/telegram';
 import axios from 'axios';
 import TimeSelector from './TimeSelector.vue';
 import SelectedDateInfo from './SelectedDateInfo.vue';
+import { useDatePickerState } from '@/composables/useDatePickerState';
+import { useDatePickerActions } from '@/composables/useDatePickerActions';
+import { useAuthToken } from '@/composables/useAuthToken';
 
 // Определение props
 const props = defineProps({
@@ -79,6 +72,7 @@ const props = defineProps({
   serviceDuration: { type: Number, default: 60 },
   organizerLocation: { type: String, default: 'AniFit' },
   userEmail: { type: String, default: '' },
+  userName: { type: String, default: 'Клиент' },
   staffInfo: { type: Object, default: null },
   petBreed: {
     type: String,
@@ -94,167 +88,65 @@ const props = defineProps({
 // События
 const emit = defineEmits(['dateSelected', 'confirmed', 'debug-log']);
 
-// Состояние компонента
-const selectedDate = ref(null);
-const calendarMode = ref('date');
-const isDarkTheme = ref(false);
-const isLoading = ref(false);
-const isSubmitted = ref(false);
-const requestId = ref(Date.now().toString());
-const breedValue = ref(props.petBreed);
+// Используем композаблы для логики
+const { 
+  selectedDate, 
+  calendarMode,
+  isDarkTheme,
+  isLoading,
+  isSubmitted,
+  requestId, 
+  breedValue,
+  selectedHour,
+  selectedMinute,
+  selectedTimeSlot,
+  timeSlots,
+  masks,
+  attributes,
+  formattedDate,
+  showConfirmButton
+} = useDatePickerState(props);
 
-// Данные для выбора времени
-const selectedHour = ref(10);
-const selectedMinute = ref(0);
-const selectedTimeSlot = ref(null);
-const hours = Array.from({ length: 13 }, (_, i) => i + 10); // от 10 до 22
-const minutes = [0, 30]; // только 0 и 30 минут
-
-// Популярные временные слоты
-const timeSlots = [
-  { label: 'Утро 10:00', value: '10:00' },
-  { label: 'Утро 11:30', value: '11:30' },
-  { label: 'День 13:00', value: '13:00' },
-  { label: 'День 15:30', value: '15:30' },
-  { label: 'Вечер 18:00', value: '18:00' },
-  { label: 'Вечер 20:30', value: '20:30' }
-];
-
-// Следим за изменением props.petBreed
-watch(() => props.petBreed, (newValue) => {
-  breedValue.value = newValue;
-});
-
-// Константы для календаря
-const masks = {
-  input: 'DD.MM.YYYY HH:mm',
-  weekdays: 'WW',
-  title: 'MMMM YYYY',
-  time: 'HH:mm',
-  data: { timeFormat: 24 }
-};
-
-// Пересчитываем атрибуты для корректного отображения текущего дня
-const attributes = computed(() => [
-  {
-    key: 'today',
-    highlight: {
-      color: 'gray',
-      fillMode: 'light',
-    },
-    dates: new Date(),
-  }
-]);
-
-// Форматируем дату для отображения
-const formattedDate = computed(() => {
-  if (!selectedDate.value) return '';
-  const date = new Date(selectedDate.value);
-  return `${date.toLocaleDateString('ru-RU', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric'
-  })} ${date.toLocaleTimeString('ru-RU', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
-  })}`;
+const {
+  initDefaultDate,
+  initTheme,
+  updateDateWithTime,
+  dateSelected,
+  confirmDate,
+  confirmSelectedDate
+} = useDatePickerActions(props, emit, {
+  selectedDate,
+  calendarMode,
+  isDarkTheme,
+  isLoading,
+  isSubmitted,
+  requestId,
+  breedValue,
+  selectedHour,
+  selectedMinute,
+  selectedTimeSlot
 });
 
 // Инициализация компонента
 onMounted(() => {
   // Инициализация токена
-  initAuthToken();
+  useAuthToken().initAuthToken();
   // Установка начальной даты
   initDefaultDate();
   // Установка темы
   initTheme();
 });
 
-// Функция инициализации токена
-function initAuthToken() {
-  if (typeof window !== 'undefined') {
-    if (!window.authToken) {
-      try {
-        const storedToken = window.localStorage?.getItem('authToken');
-        if (storedToken) {
-          window.authToken = storedToken;
-        }
-      } catch (e) {
-        // Ошибка доступа к localStorage
-      }
-      
-      if (!window.authToken && window.axios?.defaults?.headers?.common?.['Authorization']) {
-        const authHeader = window.axios.defaults.headers.common['Authorization'];
-        if (authHeader && authHeader.startsWith('Bearer ')) {
-          window.authToken = authHeader.substring(7);
-        }
-      }
-    }
-  }
-}
-
-// Функция установки начальной даты и времени
-function initDefaultDate() {
-  const today = new Date();
-  
-  if (isNaN(today.getTime())) {
-    selectedDate.value = new Date();
-  } else {
-    selectedDate.value = today;
-  }
-  
-  calendarMode.value = 'datetime';
-  
-  const currentHour = today.getHours();
-  selectedHour.value = currentHour < 10 ? 10 : currentHour > 22 ? 22 : currentHour;
-  selectedMinute.value = today.getMinutes() < 30 ? 0 : 30;
-  
-  updateDateWithTime();
-}
-
-// Функция определения темы
-function initTheme() {
-  if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
-    const colorScheme = window.Telegram.WebApp.colorScheme;
-    isDarkTheme.value = colorScheme === 'dark';
-  } else {
-    isDarkTheme.value = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-  }
-}
-
-// Функция выбора временного слота
-const selectTimeSlot = (timeSlot) => {
-  selectedTimeSlot.value = timeSlot;
-  const [hours, minutes] = timeSlot.split(':');
-  selectedHour.value = parseInt(hours);
-  selectedMinute.value = parseInt(minutes);
-  updateDateWithTime();
+// Функция для форматирования времени отображения
+const formatDisplayTime = (timeString) => {
+  if (!timeString) return '';
+  return timeString;
 };
 
-// Обновление даты с выбранным временем
-const updateDateWithTime = () => {
-  if (!selectedDate.value) return;
-  
-  try {
-    const date = new Date(selectedDate.value);
-    if (isNaN(date.getTime())) return;
-    
-    date.setHours(selectedHour.value);
-    date.setMinutes(selectedMinute.value);
-    date.setSeconds(0);
-    selectedDate.value = date;
-    
-    // Проверяем и устанавливаем selectedTimeSlot для текущего времени
-    const timeString = `${selectedHour.value}:${selectedMinute.value.toString().padStart(2, '0')}`;
-    const matchingSlot = timeSlots.find(slot => slot.value === timeString);
-    if (matchingSlot) {
-      selectedTimeSlot.value = matchingSlot.value;
-    }
-  } catch (error) {
-    // Ошибка при обновлении даты
-  }
-};
+// Следим за изменением props.petBreed
+watch(() => props.petBreed, (newValue) => {
+  breedValue.value = newValue;
+});
 
 // Следим за изменением часов и минут для обновления даты
 watch([selectedHour, selectedMinute], () => {
@@ -300,573 +192,6 @@ watch(selectedDate, (newValue, oldValue) => {
     }
   }
 });
-
-// Обработчик выбора даты
-const dateSelected = (date) => {
-  try {
-    // Если дата была сброшена, возвращаем режим к выбору только даты
-    if (!date) {
-      calendarMode.value = 'date';
-      selectedTimeSlot.value = null;
-      return;
-    }
-    
-    // Проверяем, что дата валидна
-    const checkDate = new Date(date);
-    if (isNaN(checkDate.getTime())) {
-      return;
-    }
-    
-    emit('dateSelected', date);
-  } catch (error) {
-    // Ошибка в обработчике
-  }
-};
-
-// Функция для обновления токена авторизации
-const refreshAuthToken = async () => {
-  try {
-    // Проверка запуска в Telegram WebApp
-    const isTelegramEnv = typeof window !== 'undefined' && window.Telegram && window.Telegram.WebApp;
-    
-    if (isTelegramEnv) {
-      return await refreshTelegramToken();
-    } else {
-      return await refreshStandardToken();
-    }
-  } catch (error) {
-    return null;
-  }
-};
-
-// Обновление токена через Telegram
-const refreshTelegramToken = async () => {
-  const tgWebApp = window.Telegram.WebApp;
-  
-  if (!tgWebApp.initData) {
-    return null;
-  }
-  
-  // Извлекаем информацию о пользователе и параметры из initData
-  const userData = tgWebApp.initDataUnsafe?.user || {};
-  
-  // Создаем запрос для повторной авторизации
-  const authRequest = {
-    initData: tgWebApp.initData,
-    telegram_data: userData,
-    client_time: new Date().toISOString(),
-    action: 'refresh_token',
-    nonce: Math.random().toString(36).substring(2, 15)
-  };
-  
-  try {
-    // Отправляем запрос на сервер с прямым использованием fetch
-    const response = await fetch('/api/auth/telegram', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'X-Requested-With': 'XMLHttpRequest'
-      },
-      body: JSON.stringify(authRequest),
-      credentials: 'include'
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Ошибка при обновлении токена: ${response.status}`);
-    }
-    
-    const data = await response.json();
-    
-    if (data && data.accessToken) {
-      return saveAndReturnToken(data.accessToken);
-    }
-  } catch (error) {
-    // Игнорируем ошибки
-  }
-  
-  return null;
-};
-
-// Обновление токена через стандартный API
-const refreshStandardToken = async () => {
-  try {
-    const response = await fetch('/api/auth/refresh-token', {
-      method: 'POST',
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'X-Requested-With': 'XMLHttpRequest'
-      }
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Ошибка при обновлении токена: ${response.status}`);
-    }
-    
-    const data = await response.json();
-    
-    if (data && data.accessToken) {
-      return saveAndReturnToken(data.accessToken);
-    }
-  } catch (error) {
-    // Игнорируем ошибки
-  }
-  
-  return null;
-};
-
-// Сохранение и возврат полученного токена
-const saveAndReturnToken = async (token) => {
-  if (typeof window !== 'undefined') {
-    // Сохраняем токен в глобальную переменную
-    window.authToken = token;
-    
-    // Обновляем заголовки axios
-    if (window.axios) {
-      window.axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    }
-    
-    // Обновляем кэш запросов
-    try {
-      if (window.caches) {
-        window.caches.keys().then(names => {
-          names.forEach(name => {
-            window.caches.delete(name);
-          });
-        });
-      }
-    } catch (cacheError) {
-      // Игнорируем ошибки кэша
-    }
-    
-    // Сохраняем в localStorage
-    try {
-      localStorage.setItem('authToken', token);
-    } catch (e) {
-      // Игнорируем ошибки localStorage
-    }
-  }
-  
-  // Небольшая задержка перед возвратом нового токена
-  await new Promise(resolve => setTimeout(resolve, 50));
-  
-  return token;
-};
-
-// Подготовка данных события для API
-const prepareEventData = () => {
-  const isAnyStaff = props.staffInfo?.id === 'any';
-  const breedInfo = breedValue.value ? `\nПорода: ${breedValue.value}` : '';
-  
-  // Создаем новую дату с выбранным временем
-  const date = new Date(selectedDate.value);
-  date.setHours(selectedHour.value);
-  date.setMinutes(selectedMinute.value);
-  date.setSeconds(0);
-  date.setMilliseconds(0);
-  
-  // Вычисляем дату и время окончания события
-  const endDateTime = new Date(date);
-  endDateTime.setMinutes(endDateTime.getMinutes() + props.serviceDuration);
-  
-  // Форматируем даты в ISO формат
-  const startDateTimeISO = date.toISOString();
-  const endDateTimeISO = endDateTime.toISOString();
-  
-  // Собираем данные о событии
-  const summary = breedValue.value 
-    ? `${props.organizerName} - ${props.serviceName} - ${breedValue.value}`
-    : `${props.organizerName} - ${props.serviceName}`;
-    
-  const description = isAnyStaff
-    ? `Запись на ${props.serviceName}\nСпециалист будет назначен автоматически${breedInfo}`
-    : `Запись на ${props.serviceName}\nСпециалист: ${props.staffInfo.name}, ${props.staffInfo.position}${breedInfo}`;
-  
-  return {
-    summary,
-    description,
-    startDateTime: startDateTimeISO,
-    endDateTime: endDateTimeISO,
-    location: props.organizerLocation,
-    attendees: [props.userEmail].filter(Boolean),
-    requestId: requestId.value,
-    color: props.color,
-    staffInfo: isAnyStaff
-      ? { id: 'any', autoAssign: true }
-      : {
-          id: props.staffInfo.id,
-          name: props.staffInfo.name,
-          position: props.staffInfo.position
-        },
-    petBreed: breedValue.value
-  };
-};
-
-// Получение токена авторизации из различных источников
-const getAuthToken = () => {
-  let authToken = '';
-  
-  if (typeof window !== 'undefined') {
-    // 1. Проверяем глобальный объект
-    if (window.authToken) {
-      authToken = window.authToken;
-    } 
-    // 2. Проверяем axios.defaults.headers
-    else if (window.axios?.defaults?.headers?.common?.['Authorization']) {
-      const authHeader = window.axios.defaults.headers.common['Authorization'];
-      if (authHeader && authHeader.startsWith('Bearer ')) {
-        authToken = authHeader.substring(7);
-      }
-    }
-    // 3. Пробуем localStorage
-    else if (window.localStorage) {
-      try {
-        authToken = window.localStorage.getItem('authToken');
-      } catch (e) {
-        // Игнорируем ошибки доступа
-      }
-    }
-  }
-  
-  return authToken;
-};
-
-// Выполнение запроса с возможными ретраями
-const executeRequest = async (options) => {
-  try {
-    // Обновляем токен в заголовках, если он доступен
-    if (typeof window !== 'undefined' && window.authToken) {
-      options.headers = {
-        ...options.headers,
-        'Authorization': `Bearer ${window.authToken}`
-      };
-    }
-    
-    // Пробуем прямой fetch
-    try {
-      const config = useRuntimeConfig();
-      const baseUrl = config.public.apiBaseUrl || 'https://maxzer.ru';
-      const url = `${baseUrl}/api/calendar/add-event`;
-      
-      const directResponse = await fetch(url, {
-        method: options.method,
-        headers: {
-          ...options.headers,
-          'X-Direct-Request': 'true'
-        },
-        body: options.body,
-        credentials: 'include'
-      });
-      
-      // Если статус не 401, возвращаем результат
-      if (directResponse.status !== 401) {
-        return await directResponse.json();
-      }
-    } catch (directError) {
-      // Игнорируем ошибку и переходим к запасному варианту
-    }
-    
-    // Запасной вариант через fetchApi
-    return await fetchApi('/api/calendar/add-event', options);
-  } catch (error) {
-    // Проверяем, является ли ошибка 401 Unauthorized
-    if (error.message.includes('401')) {
-      return { status: 401, error: error.message };
-    }
-    throw error;
-  }
-};
-
-// Функция подтверждения выбранной даты и создания события
-const confirmDate = async () => {
-  if (isSubmitted.value || isLoading.value) {
-    return;
-  }
-
-  try {
-    isLoading.value = true;
-    
-    // Проверка наличия информации о сотруднике
-    if (!props.staffInfo || !props.staffInfo.id) {
-      throw new Error('Необходимо выбрать специалиста для записи');
-    }
-    
-    // Подготовка данных события
-    const eventData = prepareEventData();
-    
-    // Получение текущего токена авторизации
-    const authToken = getAuthToken();
-    
-    // Формирование параметров запроса
-    const requestOptions = {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
-      },
-      body: JSON.stringify(eventData)
-    };
-    
-    // Ограничение на количество попыток обновления токена
-    let tokenRefreshAttempts = 0;
-    const maxRefreshAttempts = 2;
-    
-    // Выполнение первичного запроса
-    let response;
-    try {
-      response = await executeRequest(requestOptions);
-    } catch (initialError) {
-      response = { status: 500, error: initialError.message };
-    }
-    
-    // Обработка ошибки авторизации и повторные попытки
-    if (response.status === 401) {
-      response = await handleAuthError(response, eventData, requestOptions, tokenRefreshAttempts, maxRefreshAttempts);
-    }
-    
-    // Проверка финального результата
-    if (response.status === 401) {
-      throw new Error('Не удалось авторизоваться после всех попыток обновления токена');
-    }
-    
-    // Обработка успешного или неуспешного создания события
-    handleEventResponse(response, eventData.startDateTime);
-  } catch (error) {
-    // Обработка ошибок
-    emit('confirmed', { 
-      date: new Date(selectedDate.value).toISOString(),
-      title: props.serviceName,
-      color: props.color,
-      staffInfo: props.staffInfo,
-      petBreed: breedValue.value
-    }, null, error.message || 'Ошибка при подтверждении даты');
-  } finally {
-    isLoading.value = false;
-  }
-};
-
-// Обработка ошибок авторизации
-const handleAuthError = async (response, eventData, requestOptions, tokenRefreshAttempts, maxRefreshAttempts) => {
-  while (tokenRefreshAttempts < maxRefreshAttempts) {
-    tokenRefreshAttempts++;
-    
-    // Пробуем обновить токен
-    const newToken = await refreshAuthToken();
-    
-    if (!newToken) {
-      break;
-    }
-    
-    // Пробуем отправить запрос с новым токеном
-    const result = await retryWithNewToken(newToken, eventData, tokenRefreshAttempts);
-    
-    // Если получили результат не 401, значит успех
-    if (result && (!result.status || result.status !== 401)) {
-      return result;
-    }
-    
-    // Сохраняем текущий ответ для возврата в случае неудачи
-    if (result) {
-      response = result;
-    }
-  }
-  
-  return response;
-};
-
-// Повторение запроса с новым токеном
-const retryWithNewToken = async (newToken, eventData, attempt) => {
-  try {
-    // Прямой запрос с новым токеном
-    const config = useRuntimeConfig();
-    const baseUrl = config.public.apiBaseUrl || 'https://maxzer.ru';
-    const url = `${baseUrl}/api/calendar/add-event`;
-    
-    // Новые заголовки с токеном
-    const headers = {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      'Authorization': `Bearer ${newToken}`,
-      'X-Retry-Attempt': `${attempt}`,
-      'Cache-Control': 'no-cache, no-store, must-revalidate',
-      'Pragma': 'no-cache'
-    };
-    
-    // Отправка запроса
-    const response = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(eventData),
-      credentials: 'include',
-      mode: 'cors',
-      cache: 'no-store'
-    });
-    
-    if (response.ok) {
-      return await response.json();
-    }
-    
-    // Если ошибка 401, возвращаем объект с ошибкой
-    if (response.status === 401) {
-      const errorText = await response.text();
-      return { status: 401, error: errorText || 'Unauthorized' };
-    }
-    
-    // Другие ошибки
-    const errorText = await response.text();
-    return { 
-      status: response.status, 
-      error: errorText || `HTTP error ${response.status}` 
-    };
-  } catch (error) {
-    // Запасной вариант через fetchApi
-    try {
-      const options = {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${newToken}`,
-          'X-Retry-Attempt': `${attempt}`
-        },
-        body: JSON.stringify(eventData)
-      };
-      
-      return await executeRequest(options);
-    } catch (apiError) {
-      return { status: 500, error: apiError.message };
-    }
-  }
-};
-
-// Обработка ответа API о создании события
-const handleEventResponse = (response, startDateTimeISO) => {
-  if (response.success) {
-    isSubmitted.value = true;
-    
-    // Формируем данные для создания события в базе данных
-    const eventData = {
-      title: props.serviceName,
-      date: startDateTimeISO,
-      endDate: new Date(new Date(startDateTimeISO).getTime() + props.serviceDuration * 60000).toISOString(),
-      color: props.color,
-      googleEventId: response.eventId || null,
-      staffInfo: props.staffInfo,
-      petBreed: breedValue.value,
-      status: 'confirmed',
-      userId: getUserId()
-    };
-    
-    // Вызываем функцию для сохранения события в базе данных
-    saveEventToDatabase(eventData);
-    
-    // Эмитим событие для родительского компонента
-    emit('confirmed', { 
-      date: startDateTimeISO,
-      title: props.serviceName,
-      color: props.color,
-      staffInfo: props.staffInfo,
-      petBreed: breedValue.value
-    });
-  } else {
-    emit('confirmed', { 
-      date: startDateTimeISO,
-      title: props.serviceName,
-      color: props.color,
-      staffInfo: props.staffInfo,
-      petBreed: breedValue.value
-    }, null, response.error || 'Ошибка при создании события');
-  }
-};
-
-// Функция для получения ID пользователя
-const getUserId = () => {
-  // Пытаемся получить пользователя из глобального состояния
-  if (typeof window !== 'undefined') {
-    // Пробуем получить из пользователя из localStorage
-    const userStr = localStorage.getItem('user');
-    if (userStr) {
-      try {
-        const user = JSON.parse(userStr);
-        return user.id;
-      } catch (error) {
-        console.error('Error parsing user from localStorage:', error);
-      }
-    }
-  }
-  return null;
-};
-
-// Сохранение события в базу данных
-const saveEventToDatabase = async (eventData) => {
-  try {
-    const config = useRuntimeConfig();
-    const baseUrl = config.public.apiBaseUrl || 'https://maxzer.ru';
-    const url = `${baseUrl}/api/events`;
-    
-    // Получаем токен авторизации
-    const authToken = getAuthToken();
-    
-    // Выполняем запрос к API
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
-      },
-      body: JSON.stringify(eventData),
-      credentials: 'include'
-    });
-    
-    if (!response.ok) {
-      console.error('Error saving event to database:', await response.text());
-      return;
-    }
-    
-    const result = await response.json();
-    console.log('Event saved to database:', result);
-  } catch (error) {
-    console.error('Exception saving event to database:', error);
-  }
-};
-
-// Обработчик выбора и подтверждения даты
-const confirmSelectedDate = () => {
-  if (props.disabled) {
-    // Если компонент отключен, блокируем подтверждение даты
-    emit('debug-log', {
-      level: 'warn',
-      message: 'Attempt to confirm date while component is disabled',
-      context: 'DatePicker'
-    });
-    return;
-  }
-  
-  if (!selectedTimeSlot.value) {
-    showNotification('Сначала выберите время', 'warning');
-    emit('debug-log', {
-      level: 'warn',
-      message: 'User attempted to confirm without selecting a time slot',
-      context: 'DatePicker'
-    });
-    return;
-  }
-
-  isCreatingEvent.value = true;
-  
-  const dateString = selectedTimeSlot.value;
-  const selectedDateTime = new Date(dateString);
-  
-  // ... existing code ...
-};
 </script>
 
 <style scoped>
