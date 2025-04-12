@@ -499,21 +499,36 @@ const cancelEvent = async (eventId) => {
     // Обработка успешного ответа
     try {
       const data = await response.json();
+      console.log('Получен ответ от сервера:', data);
       
-      if (data && data.status === 'cancelled') {
+      if (data && data.success) {
         // Обновляем событие в локальном массиве
         const index = scheduledEvents.value.findIndex(event => event.id === eventId);
         
         if (index !== -1) {
-          scheduledEvents.value[index].status = 'cancelled';
-          scheduledEvents.value[index].color = 'red';
+          // Обновляем поля события из ответа сервера
+          if (data.event) {
+            console.log('Обновляем событие из ответа:', data.event);
+            // Создаем новый объект, объединяя существующие данные с данными из сервера
+            scheduledEvents.value[index] = {
+              ...scheduledEvents.value[index],
+              ...data.event,
+              status: 'cancelled',
+              color: '#f44336'
+            };
+          } else {
+            // Резервный вариант, если структура ответа неожиданная
+            scheduledEvents.value[index].status = 'cancelled';
+            scheduledEvents.value[index].color = '#f44336';
+          }
+        } else {
+          console.warn(`Событие с id=${eventId} не найдено в локальном массиве`);
         }
         
         // Уведомляем пользователя
         showNotification('Событие успешно отменено', 'success');
-        console.log('Событие успешно отменено:', data);
       } else {
-        console.warn('Неожиданный ответ сервера:', data);
+        console.warn('Неожиданная структура ответа:', data);
         showNotification('Событие было обработано, но произошла неожиданная ошибка. Обновите страницу.', 'warning');
       }
     } catch (parseError) {
