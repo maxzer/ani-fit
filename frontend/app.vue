@@ -326,6 +326,53 @@ onMounted(async () => {
   // Пытаемся инициализировать WebApp
   const isReady = await initializeWebApp();
   
+  // Добавляем глобальную функцию для показа уведомлений
+  if (typeof window !== 'undefined') {
+    window.showNotification = (message, type = 'info') => {
+      // Создаем элемент уведомления, если его еще нет
+      let notification = document.getElementById('global-notification');
+      
+      if (!notification) {
+        notification = document.createElement('div');
+        notification.id = 'global-notification';
+        notification.style.position = 'fixed';
+        notification.style.bottom = '20px';
+        notification.style.left = '50%';
+        notification.style.transform = 'translateX(-50%)';
+        notification.style.padding = '12px 20px';
+        notification.style.borderRadius = '8px';
+        notification.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.2)';
+        notification.style.zIndex = '9999';
+        notification.style.maxWidth = '90%';
+        notification.style.transition = 'opacity 0.3s ease-in-out';
+        document.body.appendChild(notification);
+      }
+      
+      // Устанавливаем цвет в зависимости от типа
+      const colors = {
+        success: '#4caf50',
+        error: '#f44336',
+        warning: '#ff9800',
+        info: '#2196f3'
+      };
+      
+      notification.style.backgroundColor = colors[type] || colors.info;
+      notification.style.color = '#ffffff';
+      notification.textContent = message;
+      notification.style.opacity = '1';
+      
+      // Автоматически скрываем через 5 секунд
+      setTimeout(() => {
+        notification.style.opacity = '0';
+        setTimeout(() => {
+          if (notification.parentNode) {
+            notification.parentNode.removeChild(notification);
+          }
+        }, 300);
+      }, 5000);
+    };
+  }
+  
   // Дополнительное расширение на полный экран с задержкой
   if (typeof window !== 'undefined' && window.Telegram && window.Telegram.WebApp) {
     // Вызываем expand при старте

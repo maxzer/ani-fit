@@ -261,9 +261,8 @@ const loadUserEvents = async () => {
       if (response.status === 401) {
         console.error('Ошибка авторизации при загрузке событий');
         showNotification('Срок действия авторизации истек. Пожалуйста, войдите заново.', 'error');
-        // Очищаем текущий токен
-        localStorage.removeItem('authToken');
-        delete window.axios?.defaults?.headers?.common?.['Authorization'];
+        // Очищаем текущий токен и перенаправляем на страницу логина
+        resetAuth();
         return;
       } else {
         throw new Error(`Error loading events: ${response.status}`);
@@ -444,6 +443,7 @@ const cancelEvent = async (eventId) => {
       if (!newToken) {
         console.error('Не удалось обновить токен авторизации');
         showNotification('Ошибка авторизации. Пожалуйста, войдите снова.', 'error');
+        resetAuth();
         isCancellingEvent.value = false;
         return;
       }
@@ -472,6 +472,7 @@ const cancelEvent = async (eventId) => {
       if (response.status === 401) {
         console.error('Получен 401 даже после обновления токена');
         showNotification('Серьезная ошибка авторизации. Пожалуйста, войдите снова или перезагрузите приложение.', 'error');
+        resetAuth();
         isCancellingEvent.value = false;
         return;
       }
@@ -674,6 +675,19 @@ const refreshAuthToken = async () => {
   }
   
   return null;
+};
+
+// Добавляем новую функцию resetAuth после функции cancelEvent
+// Функция для сброса авторизации и перенаправления на страницу логина
+const resetAuth = () => {
+  // Очищаем токен и данные авторизации
+  localStorage.removeItem('authToken');
+  delete window.axios?.defaults?.headers?.common?.['Authorization'];
+  
+  // Используем функцию logout из глобального состояния
+  if (logout) {
+    logout();
+  }
 };
 </script>
 
