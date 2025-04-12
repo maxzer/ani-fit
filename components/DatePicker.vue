@@ -719,6 +719,24 @@ const retryWithNewToken = async (newToken, eventData, attempt) => {
 const handleEventResponse = (response, startDateTimeISO) => {
   if (response.success) {
     isSubmitted.value = true;
+    
+    // Формируем данные для создания события в базе данных
+    const eventData = {
+      title: props.serviceName,
+      date: startDateTimeISO,
+      endDate: new Date(new Date(startDateTimeISO).getTime() + props.serviceDuration * 60000).toISOString(),
+      color: props.color,
+      googleEventId: response.eventId || null,
+      staffInfo: props.staffInfo,
+      petBreed: breedValue.value,
+      status: 'confirmed',
+      userId: getUserId()
+    };
+    
+    // Вызываем функцию для сохранения события в базе данных
+    saveEventToDatabase(eventData);
+    
+    // Эмитим событие для родительского компонента
     emit('confirmed', { 
       date: startDateTimeISO,
       title: props.serviceName,
@@ -734,6 +752,58 @@ const handleEventResponse = (response, startDateTimeISO) => {
       staffInfo: props.staffInfo,
       petBreed: breedValue.value
     }, null, response.error || 'Ошибка при создании события');
+  }
+};
+
+// Функция для получения ID пользователя
+const getUserId = () => {
+  // Пытаемся получить пользователя из глобального состояния
+  if (typeof window !== 'undefined') {
+    // Пробуем получить из пользователя из localStorage
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        return user.id;
+      } catch (error) {
+        console.error('Error parsing user from localStorage:', error);
+      }
+    }
+  }
+  return null;
+};
+
+// Сохранение события в базу данных
+const saveEventToDatabase = async (eventData) => {
+  try {
+    const config = useRuntimeConfig();
+    const baseUrl = config.public.apiBaseUrl || 'https://maxzer.ru';
+    const url = `${baseUrl}/api/events`;
+    
+    // Получаем токен авторизации
+    const authToken = getAuthToken();
+    
+    // Выполняем запрос к API
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
+      },
+      body: JSON.stringify(eventData),
+      credentials: 'include'
+    });
+    
+    if (!response.ok) {
+      console.error('Error saving event to database:', await response.text());
+      return;
+    }
+    
+    const result = await response.json();
+    console.log('Event saved to database:', result);
+  } catch (error) {
+    console.error('Exception saving event to database:', error);
   }
 };
 </script>

@@ -26,6 +26,7 @@ model User {
   
   auth       Auth?
   sessions   Session[]
+  events     Event[]
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -52,4 +53,30 @@ model Session {
   createdAt DateTime @default(now())
 
   @@map("sessions")
+}
+
+// Модель для событий пользователя
+model Event {
+  id          Int      @id @default(autoincrement())
+  title       String
+  date        DateTime
+  endDate     DateTime?
+  color       String   @default("#4caf50")
+  googleEventId String? // ID события в Google Calendar
+  
+  // Информация о сотруднике в формате JSON
+  staffInfo   Json?
+  petBreed    String?
+  
+  // Статус события
+  status      String   @default("confirmed") // confirmed, cancelled, pending
+  
+  // Связь с пользователем
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("events")
 } 

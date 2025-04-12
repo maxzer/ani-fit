@@ -244,6 +244,144 @@ async function bootstrap() {
     }
   });
   
+  // API для сохранения события в базу данных
+  app.post('/api/events', async (request, reply) => {
+    try {
+      // Получаем данные из запроса
+      const body = request.body as any;
+      
+      // Проверяем обязательные поля
+      if (!body.title || !body.date || !body.userId) {
+        return reply.status(400).send({
+          success: false,
+          error: 'Отсутствуют обязательные поля: title, date, userId'
+        });
+      }
+      
+      // Создаем событие в базе данных
+      const event = await prisma.event.create({
+        data: {
+          title: body.title,
+          date: new Date(body.date),
+          endDate: body.endDate ? new Date(body.endDate) : null,
+          color: body.color || "#4caf50",
+          googleEventId: body.googleEventId,
+          staffInfo: body.staffInfo ? JSON.parse(JSON.stringify(body.staffInfo)) : null,
+          petBreed: body.petBreed,
+          status: body.status || "confirmed",
+          userId: body.userId
+        }
+      });
+      
+      return {
+        success: true,
+        event
+      };
+    } catch (error) {
+      console.error('Error creating event:', error);
+      reply.status(500).send({
+        success: false,
+        error: 'Не удалось сохранить событие'
+      });
+    }
+  });
+  
+  // API для получения событий пользователя
+  app.get('/api/events', async (request, reply) => {
+    try {
+      const userId = (request.query as any).userId as string;
+      
+      if (!userId) {
+        return reply.status(400).send({
+          success: false,
+          error: 'Не указан userId'
+        });
+      }
+      
+      // Получаем события пользователя, сортированные по дате
+      const events = await prisma.event.findMany({
+        where: {
+          userId: parseInt(userId),
+        },
+        orderBy: {
+          date: 'asc'
+        }
+      });
+      
+      return {
+        success: true,
+        events
+      };
+    } catch (error) {
+      console.error('Error getting events:', error);
+      reply.status(500).send({
+        success: false,
+        error: 'Не удалось получить события'
+      });
+    }
+  });
+  
+  // API для удаления события
+  app.delete('/api/events/:id', async (request, reply) => {
+    try {
+      const eventId = (request.params as any).id as string;
+      const userId = (request.query as any).userId as string;
+      
+      if (!eventId) {
+        return reply.status(400).send({
+          success: false,
+          error: 'Не указан id события'
+        });
+      }
+      
+      // Проверяем, что событие принадлежит пользователю
+      const event = await prisma.event.findFirst({
+        where: {
+          id: parseInt(eventId),
+          userId: parseInt(userId)
+        }
+      });
+      
+      if (!event) {
+        return reply.status(404).send({
+          success: false,
+          error: 'Событие не найдено или не принадлежит пользователю'
+        });
+      }
+      
+      // Удаляем событие из Google Calendar, если есть ID
+      if (event.googleEventId) {
+        try {
+          await jwtClient.authorize();
+          await calendar.events.delete({
+            calendarId: process.env.GOOGLE_CALENDAR_ID,
+            eventId: event.googleEventId
+          });
+        } catch (calendarError) {
+          console.error('Error deleting event from Google Calendar:', calendarError);
+          // Продолжаем удаление из БД даже при ошибке в Google Calendar
+        }
+      }
+      
+      // Удаляем событие из базы данных
+      await prisma.event.delete({
+        where: {
+          id: parseInt(eventId)
+        }
+      });
+      
+      return {
+        success: true
+      };
+    } catch (error) {
+      console.error('Error deleting event:', error);
+      reply.status(500).send({
+        success: false,
+        error: 'Не удалось удалить событие'
+      });
+    }
+  });
+  
   try {
     const port = process.env.PORT || 3001;
     await app.listen({ port: Number(port), host: '0.0.0.0' });
