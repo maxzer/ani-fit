@@ -70,7 +70,11 @@ export class AuthService {
     }
   }
 
-  async findOrCreateUser(data: TelegramUserData): Promise<User> {
+  async findOrCreateUser(data: TelegramUserData, realNameData?: { 
+    realName?: string;
+    realLastName?: string;
+    realPatronymic?: string;
+  }): Promise<User> {
     try {
       // Ищем пользователя по telegramId
       let user = await this.prisma.user.findFirst({
@@ -87,18 +91,35 @@ export class AuthService {
             username: data.username || '',
             photoUrl: data.photo_url,
             email: `telegram_${data.id}@example.com`, // Создаем фейковый email для совместимости
+            // Добавляем реальные ФИО, если они предоставлены
+            realName: realNameData?.realName || '',
+            realLastName: realNameData?.realLastName || '',
+            realPatronymic: realNameData?.realPatronymic || ''
           }
         });
       } else {
         // Обновляем данные пользователя
+        const updateData: any = {
+          firstName: data.first_name,
+          lastName: data.last_name || '',
+          username: data.username || '',
+          photoUrl: data.photo_url,
+        };
+
+        // Добавляем реальные ФИО к обновлению, только если они предоставлены
+        if (realNameData?.realName) {
+          updateData.realName = realNameData.realName;
+        }
+        if (realNameData?.realLastName) {
+          updateData.realLastName = realNameData.realLastName;
+        }
+        if (realNameData?.realPatronymic) {
+          updateData.realPatronymic = realNameData.realPatronymic;
+        }
+
         user = await this.prisma.user.update({
           where: { id: user.id },
-          data: {
-            firstName: data.first_name,
-            lastName: data.last_name || '',
-            username: data.username || '',
-            photoUrl: data.photo_url,
-          }
+          data: updateData
         });
       }
 

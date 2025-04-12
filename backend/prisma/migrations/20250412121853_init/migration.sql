@@ -7,6 +7,9 @@ CREATE TABLE "users" (
     "photoUrl" TEXT,
     "username" TEXT,
     "telegramId" TEXT,
+    "realName" TEXT DEFAULT '',
+    "realLastName" TEXT DEFAULT '',
+    "realPatronymic" TEXT DEFAULT '',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 

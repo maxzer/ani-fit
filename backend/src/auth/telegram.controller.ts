@@ -6,6 +6,10 @@ import jwt from 'jsonwebtoken';
 
 interface TelegramAuthRequest {
   initData: string;
+  telegram_data?: any;
+  real_name?: string;
+  real_lastname?: string;
+  real_patronymic?: string;
 }
 
 export default async function telegramAuthController(fastify: FastifyInstance, prisma: PrismaClient) {
@@ -27,7 +31,10 @@ export default async function telegramAuthController(fastify: FastifyInstance, p
         type: 'object',
         required: ['initData'],
         properties: {
-          initData: { type: 'string' }
+          initData: { type: 'string' },
+          real_name: { type: 'string' },
+          real_lastname: { type: 'string' },
+          real_patronymic: { type: 'string' }
         }
       }
     },
@@ -43,6 +50,9 @@ export default async function telegramAuthController(fastify: FastifyInstance, p
         console.log('Request headers:', request.headers);
         console.log('Request body:', request.body);
         console.log('RECEIVED INIT DATA:', request.body.initData);
+        console.log('RECEIVED REAL NAME:', request.body.real_name);
+        console.log('RECEIVED REAL LASTNAME:', request.body.real_lastname);
+        console.log('RECEIVED REAL PATRONYMIC:', request.body.real_patronymic);
         console.log('======================================');
         
         // Валидация initData
@@ -58,7 +68,11 @@ export default async function telegramAuthController(fastify: FastifyInstance, p
         // Найти или создать пользователя
         let user;
         try {
-          user = await authService.findOrCreateUser(userData);
+          user = await authService.findOrCreateUser(userData, {
+            realName: request.body.real_name,
+            realLastName: request.body.real_lastname,
+            realPatronymic: request.body.real_patronymic
+          });
           console.log('Found/Created user:', user);
         } catch (userError) {
           console.error('User creation error:', userError);
@@ -101,7 +115,10 @@ export default async function telegramAuthController(fastify: FastifyInstance, p
             firstName: user.firstName,
             lastName: user.lastName,
             username: user.username,
-            photoUrl: user.photoUrl
+            photoUrl: user.photoUrl,
+            realName: user.realName,
+            realLastName: user.realLastName,
+            realPatronymic: user.realPatronymic
           }
         };
         console.log('Sending successful response:', response);

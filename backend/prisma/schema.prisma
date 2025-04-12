@@ -18,6 +18,12 @@ model User {
   photoUrl   String? 
   username   String?
   telegramId String? @unique
+  
+  // Поля для полного ФИО
+  realName      String? @default("")
+  realLastName  String? @default("")
+  realPatronymic String? @default("")
+  
   auth       Auth?
   sessions   Session[]
   createdAt  DateTime @default(now())
