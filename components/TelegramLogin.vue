@@ -477,23 +477,17 @@ async function handleLogin() {
     
     // Обрабатываем ответ
     networkDetails.value.response = response.data;
-    addDebugLog(`Получен ответ: ${response.data.success ? 'успешно' : 'ошибка'}`);
+    addDebugLog(`Получен ответ с токеном: ${response.data.accessToken ? 'да' : 'нет'}`);
     
-    if (response.data.success) {
+    if (response.data.accessToken) {
       // Успешная обработка ответа
       if (response.data.needsProfile) {
         // Если нужно заполнить профиль
-        setTempAuth({
-          token: response.data.token,
-          user: response.data.user
-        });
+        setTempAuth(response.data.accessToken, response.data.user);
         addDebugLog('Требуется заполнение профиля');
       } else {
         // Полная авторизация
-        setAuth({
-          token: response.data.token,
-          user: response.data.user
-        });
+        setAuth(response.data.accessToken, response.data.user);
         addDebugLog('Авторизация успешна');
       }
       
@@ -503,7 +497,7 @@ async function handleLogin() {
       authState.value = 'успех';
     } else {
       // Ошибка авторизации
-      throw new Error(response.data.error || 'Ошибка авторизации');
+      throw new Error(response.data.error || 'Ошибка авторизации: токен отсутствует');
     }
   } catch (error) {
     // Обработка ошибок

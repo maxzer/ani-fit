@@ -46,22 +46,55 @@ export default async function telegramAuthController(fastify: FastifyInstance, p
         console.log('======================================');
         
         // Валидация initData
-        const userData = await authService.validateInitData(request.body.initData);
+        let userData;
+        try {
+          userData = await authService.validateInitData(request.body.initData);
+          console.log('Validated user data:', userData);
+        } catch (validationError) {
+          console.error('Validation error:', validationError);
+          throw validationError;
+        }
         
         // Найти или создать пользователя
-        const user = await authService.findOrCreateUser(userData);
+        let user;
+        try {
+          user = await authService.findOrCreateUser(userData);
+          console.log('Found/Created user:', user);
+        } catch (userError) {
+          console.error('User creation error:', userError);
+          throw userError;
+        }
         
         // Генерация токенов
-        const tokens = authService.generateTokens(user);
+        let tokens;
+        try {
+          tokens = authService.generateTokens(user);
+          console.log('Generated tokens successfully');
+        } catch (tokenError) {
+          console.error('Token generation error:', tokenError);
+          throw tokenError;
+        }
         
         // Сохраняем refresh токен в базу данных
-        await authService.saveRefreshToken(user.id, tokens.refreshToken);
+        try {
+          await authService.saveRefreshToken(user.id, tokens.refreshToken);
+          console.log('Refresh token saved to database');
+        } catch (saveError) {
+          console.error('Error saving refresh token:', saveError);
+          throw saveError;
+        }
         
         // Установка cookie для refresh токена
-        reply.setCookie('refreshToken', tokens.refreshToken, cookieOptions);
+        try {
+          console.log('Setting cookie with options:', cookieOptions);
+          reply.setCookie('refreshToken', tokens.refreshToken, cookieOptions);
+        } catch (cookieError) {
+          console.error('Error setting cookie:', cookieError);
+          throw cookieError;
+        }
         
         // Возвращаем access токен и данные пользователя
-        return reply.code(200).send({
+        const response = {
           accessToken: tokens.accessToken,
           user: {
             id: user.id,
@@ -70,18 +103,43 @@ export default async function telegramAuthController(fastify: FastifyInstance, p
             username: user.username,
             photoUrl: user.photoUrl
           }
-        });
+        };
+        console.log('Sending successful response:', response);
+        return reply.code(200).send(response);
       } catch (error) {
+        console.error('===== TELEGRAM AUTH ERROR =====');
+        console.error('Error type:', (error as Error).constructor.name);
+        console.error('Error message:', (error as Error).message);
+        console.error('Error stack:', (error as Error).stack);
+        console.error('==============================');
+        
         // Обработка ошибок
         if (error instanceof InvalidTelegramDataError) {
-          return reply.code(401).send({ error: error.message });
+          return reply.code(401).send({ 
+            success: false, 
+            error: error.message,
+            errorType: 'InvalidTelegramData'
+          });
         } else if (error instanceof UserCreationError) {
-          return reply.code(500).send({ error: error.message });
+          return reply.code(500).send({ 
+            success: false, 
+            error: error.message,
+            errorType: 'UserCreation'
+          });
         } else if (error instanceof TokenGenerationError) {
-          return reply.code(500).send({ error: error.message });
+          return reply.code(500).send({ 
+            success: false, 
+            error: error.message,
+            errorType: 'TokenGeneration'
+          });
         }
         
-        return reply.code(500).send({ error: 'Unexpected error' });
+        return reply.code(500).send({ 
+          success: false, 
+          error: 'Unexpected error',
+          errorType: 'Unknown',
+          message: (error as Error).message
+        });
       }
     }
   });
