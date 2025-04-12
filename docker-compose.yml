@@ -5,7 +5,7 @@ services:
   frontend:
     container_name: ani-fit-frontend
     build:
-      context: .
+      context: ./frontend
       dockerfile: Dockerfile
     restart: always
     environment:

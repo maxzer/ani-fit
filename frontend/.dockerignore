@@ -13,11 +13,7 @@ dist
 
 # Docker
 .dockerignore
-Dockerfile
 docker-compose.yml
-
-# Backend
-backend/
 
 # IDE
 .vscode
@@ -31,9 +27,10 @@ logs
 .npm
 .cache
 
-.env
+# Environment files, except for .env.production
+.env.local
+.env.development
 .github
 start.sh
-*.md
 scripts
 snippets 

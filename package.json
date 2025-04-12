@@ -2,12 +2,17 @@
   "name": "ani-fit",
   "private": true,
   "scripts": {
-    "build": "nuxt build",
-    "dev": "nuxt dev",
-    "generate": "nuxt generate",
-    "preview": "nuxt preview",
-    "postinstall": "node -e \"process.env.NUXT_SKIP_PREPARE || require('child_process').execSync('nuxt prepare', {stdio: 'inherit'});\"",
-    "start": "node .output/server/index.mjs"
+    "build:frontend": "cd frontend && npm run build",
+    "dev:frontend": "cd frontend && npm run dev",
+    "generate:frontend": "cd frontend && npm run generate",
+    "preview:frontend": "cd frontend && npm run preview",
+    "start:frontend": "cd frontend && npm run start",
+    "dev:backend": "cd backend && npm run dev",
+    "build:backend": "cd backend && npm run build",
+    "start:backend": "cd backend && npm run start",
+    "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
+    "build": "npm run build:frontend && npm run build:backend",
+    "start": "concurrently \"npm run start:frontend\" \"npm run start:backend\""
   },
   "dependencies": {
     "@fastify/jwt": "^9.1.0",
@@ -24,6 +29,7 @@
   "devDependencies": {
     "@types/axios": "^0.9.36",
     "@types/node": "^22.14.1",
+    "concurrently": "^8.2.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3"
   }

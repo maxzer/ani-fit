@@ -1,0 +1,30 @@
+{
+  "name": "ani-fit",
+  "private": true,
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "postinstall": "node -e \"process.env.NUXT_SKIP_PREPARE || require('child_process').execSync('nuxt prepare', {stdio: 'inherit'});\"",
+    "start": "node .output/server/index.mjs"
+  },
+  "dependencies": {
+    "@fastify/jwt": "^9.1.0",
+    "@popperjs/core": "^2.11.8",
+    "axios": "^1.8.4",
+    "dotenv": "^16.5.0",
+    "fastify": "^5.2.2",
+    "googleapis": "^148.0.0",
+    "nuxt": "^3.16.2",
+    "v-calendar": "^3.1.2",
+    "vue": "^3.5.13",
+    "vue-router": "^4.5.0"
+  },
+  "devDependencies": {
+    "@types/axios": "^0.9.36",
+    "@types/node": "^22.14.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
+  }
+}
