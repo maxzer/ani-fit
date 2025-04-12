@@ -63,28 +63,26 @@
             </svg>
           </div>
           <div class="event-info">
-            <div class="event-title-row">
+            <div class="event-header">
               <div class="event-title" :class="{ 'cancelled-text': event.status === 'cancelled' }">{{ event.title }}</div>
               <div v-if="event.status" class="event-status" :class="'status-' + event.status">
                 {{ getStatusText(event.status) }}
               </div>
             </div>
-            <div class="event-datetime">
-              <div class="event-date">{{ formatDateOnly(event.date) }}</div>
-              <div class="event-time" :style="{ color: event.color }">{{ formatTimeOnly(event.date) }}</div>
+            <div class="event-details">
+              <span class="event-date">{{ formatDateOnly(event.date) }}</span>
+              <span class="event-time-separator">•</span>
+              <span class="event-time" :style="{ color: event.color }">{{ formatTimeOnly(event.date) }}</span>
+              <span class="event-staff-info" v-if="event.staffInfo">• {{ getStaffName(event.staffInfo) }}</span>
             </div>
-            <div v-if="event.staffInfo" class="event-staff">
-              Специалист: {{ getStaffName(event.staffInfo) }}
-            </div>
-            <div v-if="event.petBreed" class="event-breed">
-              Порода: {{ event.petBreed }}
-            </div>
+            <div v-if="event.petBreed" class="event-breed">{{ event.petBreed }}</div>
           </div>
           <button 
             v-if="event.status !== 'cancelled'" 
             @click="cancelEvent(event.id)" 
             class="cancel-event-button"
             :disabled="isCancellingEvent"
+            aria-label="Отменить событие"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -785,30 +783,30 @@ const resetAuth = () => {
   margin-top: 32px;
   background-color: var(--tg-theme-secondary-bg-color, rgba(255, 255, 255, 0.06));
   border-radius: 16px;
-  padding: 20px;
+  padding: 16px;
   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .scheduled-events .section-title {
   margin-top: 0;
-  margin-bottom: 20px;
-  padding-bottom: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 10px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .events-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .event-item {
   background-color: var(--tg-theme-bg-color, rgba(255, 255, 255, 0.04));
   border-radius: 12px;
-  padding: 16px;
+  padding: 12px;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
@@ -828,47 +826,54 @@ const resetAuth = () => {
 }
 
 .event-icon {
-  width: 44px;
-  height: 44px;
-  min-width: 44px;
-  border-radius: 12px;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-right: 14px;
+  margin-right: 12px;
   background-image: linear-gradient(45deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.01));
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .event-icon svg {
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
 }
 
 .event-info {
   flex: 1;
+  min-width: 0; /* Для правильного сокращения текста */
 }
 
-.event-title-row {
+.event-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 4px;
-}
-
-.event-title {
-  font-weight: 700;
-  color: var(--tg-theme-text-color, #ffffff);
-  font-size: 16px;
   margin-bottom: 2px;
 }
 
-.event-status {
-  padding: 3px 8px;
-  font-size: 12px;
+.event-title {
   font-weight: 600;
-  border-radius: 6px;
+  color: var(--tg-theme-text-color, #ffffff);
+  font-size: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 170px;
+}
+
+.event-status {
+  padding: 2px 6px;
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: 4px;
+  white-space: nowrap;
+  min-width: 75px;
+  text-align: center;
 }
 
 .status-confirmed {
@@ -881,40 +886,40 @@ const resetAuth = () => {
   color: #ffac33;
 }
 
-.event-datetime {
+.event-details {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-top: 4px;
+  font-size: 13px;
+  color: var(--tg-theme-hint-color, #9e9e9e);
+  flex-wrap: wrap;
+  gap: 4px;
 }
 
-.event-date {
-  color: var(--tg-theme-hint-color, #9e9e9e);
-  font-size: 14px;
+.event-time-separator {
+  font-size: 10px;
+  opacity: 0.7;
+  margin: 0 2px;
 }
 
 .event-time {
   font-weight: 600;
-  font-size: 14px;
-}
-
-.event-staff, .event-breed {
-  color: var(--tg-theme-hint-color, #9e9e9e);
   font-size: 13px;
-  margin-top: 5px;
-  display: flex;
-  align-items: center;
 }
 
-.event-staff:before, .event-breed:before {
-  content: '';
-  display: inline-block;
-  width: 4px;
-  height: 4px;
-  background-color: currentColor;
-  border-radius: 50%;
-  margin-right: 6px;
-  opacity: 0.6;
+.event-staff-info {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 150px;
+}
+
+.event-breed {
+  color: var(--tg-theme-hint-color, #9e9e9e);
+  font-size: 12px;
+  margin-top: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .cancel-event-button {
@@ -922,17 +927,13 @@ const resetAuth = () => {
   border: none;
   color: var(--tg-theme-hint-color, #9e9e9e);
   cursor: pointer;
-  padding: 6px;
+  padding: 4px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   opacity: 0.7;
-}
-
-.cancel-event-button svg {
-  width: 16px;
-  height: 16px;
+  margin-left: 4px;
 }
 
 .notification {
