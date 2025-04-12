@@ -1,15 +1,114 @@
 import { FastifyInstance } from 'fastify';
 import { PrismaClient } from '@prisma/client';
 import { setupGoogleCalendar } from '../utils/googleCalendar';
+import { getEventStatusFromCalendar } from '../utils/calendarWatcher';
 
 // Тип для расширения PrismaClient
 type PrismaClientWithModels = PrismaClient & {
   viewedPriceList: any;
+  systemSetting: any;
 };
 
 export default async function eventsController(app: FastifyInstance, prisma: PrismaClientWithModels) {
   // Настройка Google Calendar
   const { jwtClient, calendar } = setupGoogleCalendar();
+  
+  // API для проверки статуса событий в Google Calendar
+  app.post('/api/events/check-status', async (request, reply) => {
+    try {
+      // Получаем данные из запроса
+      const body = request.body as any;
+      
+      // Проверяем обязательные поля
+      if (!body.eventIds || !Array.isArray(body.eventIds)) {
+        return reply.status(400).send({
+          success: false,
+          error: 'Отсутствует массив eventIds'
+        });
+      }
+      
+      await jwtClient.authorize();
+      
+      const results = [];
+      const events = [];
+      
+      // Проверяем статус каждого события используя общую функцию
+      for (const googleEventId of body.eventIds) {
+        try {
+          // Получаем статус события из Google Calendar
+          const eventStatus = await getEventStatusFromCalendar(calendar, googleEventId);
+          
+          // Если произошла ошибка при получении события, добавляем информацию об ошибке
+          if (eventStatus.status === 'error') {
+            results.push({
+              googleEventId,
+              status: 'error',
+              error: eventStatus.error || 'Не удалось получить информацию о событии'
+            });
+            continue;
+          }
+          
+          // Обновляем статус события в базе данных
+          const status = eventStatus.status;
+          const color = status === 'confirmed' ? '#4caf50' : 
+                       status === 'cancelled' ? '#f44336' : '#ff9800';
+          
+          const updatedEvents = await prisma.event.updateMany({
+            where: {
+              googleEventId
+            },
+            data: {
+              status,
+              color
+            }
+          });
+          
+          // Получаем обновленное событие из базы данных
+          const dbEvent = await prisma.event.findFirst({
+            where: {
+              googleEventId
+            }
+          });
+          
+          if (dbEvent) {
+            events.push({
+              id: dbEvent.id,
+              googleEventId,
+              status,
+              title: dbEvent.title,
+              date: dbEvent.date,
+              color: dbEvent.color
+            });
+          }
+          
+          results.push({
+            googleEventId,
+            status,
+            updated: updatedEvents.count > 0
+          });
+        } catch (eventError) {
+          console.error(`Error checking event ${googleEventId}:`, eventError);
+          results.push({
+            googleEventId,
+            status: 'error',
+            error: 'Не удалось получить информацию о событии'
+          });
+        }
+      }
+      
+      return {
+        success: true,
+        results,
+        events
+      };
+    } catch (error) {
+      console.error('Error checking event statuses:', error);
+      reply.status(500).send({
+        success: false,
+        error: 'Не удалось проверить статусы событий'
+      });
+    }
+  });
   
   // API для сохранения события в базу данных
   app.post('/api/events', async (request, reply) => {

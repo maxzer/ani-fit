@@ -4,6 +4,7 @@ import { execSync } from 'child_process';
 // Расширяем тип PrismaClient для включения моделей, которые могут быть не распознаны
 export type PrismaClientWithModels = PrismaClient & {
   viewedPriceList: any;
+  systemSetting: any;
 };
 
 const MAX_RETRIES = 10;

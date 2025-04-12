@@ -52,12 +52,12 @@ export const useEventUtils = (props, state) => {
     
     // Собираем данные о событии
     const summary = state.breedValue.value 
-      ? `${clientName} - ${props.serviceName} - ${state.breedValue.value}`
-      : `${clientName} - ${props.serviceName}`;
+      ? `(На подтверждении) ${clientName} - ${props.serviceName} - ${state.breedValue.value}`
+      : `(На подтверждении) ${clientName} - ${props.serviceName}`;
       
     const description = isAnyStaff
-      ? `Запись на ${props.serviceName}\nСпециалист будет назначен автоматически${breedInfo}`
-      : `Запись на ${props.serviceName}\nСпециалист: ${props.staffInfo.name}, ${props.staffInfo.position}${breedInfo}`;
+      ? `Запись на ${props.serviceName}\nСпециалист будет назначен автоматически${breedInfo}\nСтатус: На подтверждении`
+      : `Запись на ${props.serviceName}\nСпециалист: ${props.staffInfo.name}, ${props.staffInfo.position}${breedInfo}\nСтатус: На подтверждении`;
     
     return {
       summary,
@@ -67,7 +67,8 @@ export const useEventUtils = (props, state) => {
       location: props.organizerLocation,
       attendees: [props.userEmail].filter(Boolean),
       requestId: state.requestId.value,
-      color: props.color,
+      color: props.color, // Используем цвет карточки вместо оранжевого
+      status: 'pending', // Статус "на подтверждении"
       staffInfo: isAnyStaff
         ? { id: 'any', autoAssign: true }
         : {
@@ -135,24 +136,25 @@ export const useEventUtils = (props, state) => {
         title: props.serviceName,
         date: startDateTimeISO,
         endDate: new Date(new Date(startDateTimeISO).getTime() + props.serviceDuration * 60000).toISOString(),
-        color: props.color,
+        color: props.color, // Используем цвет карточки вместо оранжевого
         googleEventId: response.eventId || null,
         staffInfo: props.staffInfo,
         petBreed: state.breedValue.value,
-        status: 'confirmed',
+        status: 'pending', // Меняем статус на "на подтверждении"
         userId: getUserId()
       };
       
       // Вызываем функцию для сохранения события в базе данных
       saveEventToDatabase(eventData);
       
-      // Эмитим событие для родительского компонента
+      // Эмитим событие для родительского компонента с информацией о статусе
       emit('confirmed', { 
         date: startDateTimeISO,
         title: props.serviceName,
-        color: props.color,
+        color: props.color, // Используем цвет карточки вместо оранжевого
         staffInfo: props.staffInfo,
-        petBreed: state.breedValue.value
+        petBreed: state.breedValue.value,
+        status: 'pending'
       });
     } else {
       emit('confirmed', { 
@@ -220,11 +222,50 @@ export const useEventUtils = (props, state) => {
     }
   };
 
+  // Функция для проверки статуса событий в Google Calendar
+  const checkEventStatus = async (eventIds) => {
+    try {
+      const config = useRuntimeConfig();
+      const baseUrl = config.public.apiBaseUrl || 'https://maxzer.ru';
+      const url = `${baseUrl}/api/events/check-status`;
+      
+      // Получаем токен авторизации
+      let authToken = '';
+      if (typeof window !== 'undefined' && window.authToken) {
+        authToken = window.authToken;
+      }
+      
+      // Выполняем запрос к API
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
+        },
+        body: JSON.stringify({ eventIds }),
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        console.error('Error checking event status:', await response.text());
+        return [];
+      }
+      
+      const result = await response.json();
+      return result.events || [];
+    } catch (error) {
+      console.error('Exception checking event status:', error);
+      return [];
+    }
+  };
+
   return {
     prepareEventData,
     executeRequest,
     handleEventResponse,
     getUserId,
-    saveEventToDatabase
+    saveEventToDatabase,
+    checkEventStatus
   };
 }; 

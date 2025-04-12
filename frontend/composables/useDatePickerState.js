@@ -15,6 +15,7 @@ export const useDatePickerState = (props) => {
   const requestId = ref(Date.now().toString());
   const breedValue = ref(props.petBreed);
   const showConfirmButton = ref(true);
+  const eventStatus = ref('pending');
 
   // Данные для выбора времени
   const selectedHour = ref(10);
@@ -69,6 +70,16 @@ export const useDatePickerState = (props) => {
     })}`;
   });
 
+  // Текст статуса события для отображения
+  const statusText = computed(() => {
+    switch (eventStatus.value) {
+      case 'pending': return 'На подтверждении';
+      case 'confirmed': return 'Подтверждено';
+      case 'cancelled': return 'Отменено';
+      default: return 'Неизвестно';
+    }
+  });
+
   return {
     selectedDate,
     calendarMode,
@@ -86,6 +97,8 @@ export const useDatePickerState = (props) => {
     masks,
     attributes,
     formattedDate,
-    showConfirmButton
+    showConfirmButton,
+    eventStatus,
+    statusText
   };
 }; 

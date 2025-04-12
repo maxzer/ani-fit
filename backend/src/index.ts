@@ -25,6 +25,14 @@ import usersController from './controllers/users.controller'
 import eventsController from './controllers/events.controller'
 import calendarController from './controllers/calendar.controller'
 import priceListsController from './controllers/price-lists.controller'
+import webhooksController from './controllers/webhooks.controller'
+import { setupCalendarWatcher, renewCalendarWatcher } from './utils/calendarWatcher'
+import { PrismaClient } from '@prisma/client'
+
+// Расширенный тип PrismaClient с дополнительными моделями
+type PrismaClientWithModels = PrismaClient & {
+  viewedPriceList: any;
+};
 
 // Основная функция запуска
 async function bootstrap() {
@@ -109,7 +117,8 @@ async function bootstrap() {
     excludePaths: [
       '/api/auth/telegram', 
       '/api/auth/check-user',
-      '/api/auth/refresh-token'
+      '/api/auth/refresh-token',
+      '/api/webhook/calendar' // Исключаем webhook для календаря
     ]
   });
   
@@ -123,12 +132,59 @@ async function bootstrap() {
   await eventsController(app, prisma);
   await calendarController(app);
   await priceListsController(app, prisma);
+  await webhooksController(app, prisma);
   
   // Запускаем сервер
   try {
     const port = process.env.PORT || 3001;
     await app.listen({ port: Number(port), host: '0.0.0.0' });
     console.log(`Сервер запущен на порту ${port}`);
+    
+    // Настраиваем webhook для календаря после успешного запуска сервера
+    app.ready(async () => {
+      try {
+        // Проверяем, есть ли информация о существующем webhook
+        const watcherInfo = await prisma.systemSetting.findUnique({
+          where: { key: 'calendarWatcherInfo' }
+        });
+        
+        if (watcherInfo) {
+          // Если есть информация, обновляем webhook
+          try {
+            const channelInfo = JSON.parse(watcherInfo.value);
+            console.log('Updating existing calendar webhook...');
+            await renewCalendarWatcher(prisma, channelInfo);
+          } catch (e) {
+            console.error('Error parsing existing watcher info:', e);
+            // Создаем новый webhook, если не удалось обновить существующий
+            await setupCalendarWatcher(prisma);
+          }
+        } else {
+          // Создаем новый webhook
+          console.log('Setting up new calendar webhook...');
+          await setupCalendarWatcher(prisma);
+        }
+        
+        // Настраиваем периодическое обновление канала (каждые 6 дней)
+        setInterval(async () => {
+          try {
+            const watcherInfo = await prisma.systemSetting.findUnique({
+              where: { key: 'calendarWatcherInfo' }
+            });
+            
+            if (watcherInfo) {
+              const channelInfo = JSON.parse(watcherInfo.value);
+              await renewCalendarWatcher(prisma, channelInfo);
+              console.log('Calendar webhook renewed successfully');
+            }
+          } catch (error) {
+            console.error('Error renewing calendar webhook:', error);
+          }
+        }, 6 * 24 * 60 * 60 * 1000); // 6 дней
+      } catch (error) {
+        console.error('Error setting up calendar webhook:', error);
+      }
+    });
   } catch (err) {
     console.error(err);
     process.exit(1);

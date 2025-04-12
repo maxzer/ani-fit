@@ -98,3 +98,13 @@ model ViewedPriceList {
   @@unique([userId, serviceTitle]) // Уникальное ограничение для пары пользователь-услуга
   @@map("viewed_price_lists")
 } 
+
+// Модель для хранения системных настроек
+model SystemSetting {
+  key        String   @id // Ключ настройки
+  value      String   @db.Text // Значение настройки
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("system_settings")
+} 

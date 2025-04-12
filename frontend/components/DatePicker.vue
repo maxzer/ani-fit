@@ -34,6 +34,7 @@
       :color="color"
       :isLoading="isLoading"
       :isStaffSelected="!!props.staffInfo && !!props.staffInfo.id"
+      :status="eventStatus"
       @confirm="confirmDate"
     />
     
@@ -48,6 +49,17 @@
         <span>Просмотрите прайс-лист перед записью</span>
       </div>
     </div>
+    
+    <!-- Кнопка подтверждения -->
+    <button 
+      v-if="showConfirmButton" 
+      @click="confirmSelectedDate" 
+      class="confirm-button" 
+      :disabled="!selectedTimeSlot || disabled"
+      :style="{ backgroundColor: disabled ? '#cccccc' : color }"
+    >
+      Подтвердить {{ selectedTimeSlot ? formatDisplayTime(selectedTimeSlot) : '' }}
+    </button>
   </div>
 </template>
 
@@ -104,7 +116,8 @@ const {
   masks,
   attributes,
   formattedDate,
-  showConfirmButton
+  showConfirmButton,
+  eventStatus
 } = useDatePickerState(props);
 
 const {

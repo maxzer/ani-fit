@@ -10,7 +10,7 @@ import { useAuthToken } from './useAuthToken';
  */
 export const useDatePickerActions = (props, emit, state) => {
   const { getAuthToken, refreshAuthToken } = useAuthToken();
-  const { prepareEventData, executeRequest, handleEventResponse } = useEventUtils(props, state);
+  const { prepareEventData, executeRequest, handleEventResponse, checkEventStatus } = useEventUtils(props, state);
 
   // Функция установки начальной даты и времени
   const initDefaultDate = () => {
@@ -327,6 +327,14 @@ export const useDatePickerActions = (props, emit, state) => {
       
       // Обработка успешного или неуспешного создания события
       handleEventResponse(response, eventData.startDateTime, emit);
+      
+      // Если событие создано успешно, запускаем проверку статуса через некоторое время
+      if (response.success && response.eventId) {
+        // Устанавливаем таймер на проверку статуса
+        setTimeout(() => {
+          checkAndUpdateEventStatus(response.eventId);
+        }, 5000); // Проверяем через 5 секунд, затем будем проверять периодически
+      }
     } catch (error) {
       // Обработка ошибок
       emit('confirmed', { 
@@ -338,6 +346,31 @@ export const useDatePickerActions = (props, emit, state) => {
       }, null, error.message || 'Ошибка при подтверждении даты');
     } finally {
       state.isLoading.value = false;
+    }
+  };
+
+  // Функция для проверки и обновления статуса события
+  const checkAndUpdateEventStatus = async (eventId) => {
+    try {
+      const events = await checkEventStatus([eventId]);
+      
+      if (events && events.length > 0) {
+        const event = events[0];
+        
+        // Обновляем статус события в интерфейсе
+        if (event.status) {
+          state.eventStatus.value = event.status;
+          
+          // Если статус всё ещё "в обработке", продолжаем проверять через интервалы
+          if (event.status === 'pending') {
+            setTimeout(() => {
+              checkAndUpdateEventStatus(eventId);
+            }, 30000); // Проверяем каждые 30 секунд
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Ошибка при проверке статуса события:', error);
     }
   };
 
@@ -372,6 +405,7 @@ export const useDatePickerActions = (props, emit, state) => {
     updateDateWithTime,
     dateSelected,
     confirmDate,
-    confirmSelectedDate
+    confirmSelectedDate,
+    checkAndUpdateEventStatus
   };
 }; 
