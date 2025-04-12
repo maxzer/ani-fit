@@ -415,6 +415,94 @@ async function bootstrap() {
     }
   });
   
+  // API для отмены события (без удаления из Google Calendar)
+  app.patch('/api/events/:id/cancel', async (request, reply) => {
+    try {
+      const eventId = (request.params as any).id as string;
+      const userId = (request.query as any).userId as string;
+      
+      if (!eventId) {
+        return reply.status(400).send({
+          success: false,
+          error: 'Не указан id события'
+        });
+      }
+      
+      // Проверяем, что событие принадлежит пользователю
+      const event = await prisma.event.findFirst({
+        where: {
+          id: parseInt(eventId),
+          userId: parseInt(userId)
+        }
+      });
+      
+      if (!event) {
+        return reply.status(404).send({
+          success: false,
+          error: 'Событие не найдено или не принадлежит пользователю'
+        });
+      }
+      
+      // Если есть ID события в Google Calendar, изменяем его цвет на красный
+      if (event.googleEventId) {
+        try {
+          await jwtClient.authorize();
+          
+          // Сначала получаем текущее событие
+          const existingEvent = await calendar.events.get({
+            calendarId: process.env.GOOGLE_CALENDAR_ID,
+            eventId: event.googleEventId
+          });
+          
+          // Обновляем событие, устанавливая красный цвет и добавляя пометку "Отменено" в описание
+          const updatedEvent = existingEvent.data;
+          
+          // Используем colorId 11 для красного цвета
+          updatedEvent.colorId = "11";
+          
+          // Добавляем пометку в описание
+          if (updatedEvent.description) {
+            updatedEvent.description = "[ОТМЕНЕНО] " + updatedEvent.description;
+          } else {
+            updatedEvent.description = "[ОТМЕНЕНО]";
+          }
+          
+          // Обновляем событие в Google Calendar
+          await calendar.events.update({
+            calendarId: process.env.GOOGLE_CALENDAR_ID,
+            eventId: event.googleEventId,
+            requestBody: updatedEvent
+          });
+        } catch (calendarError) {
+          console.error('Error updating event in Google Calendar:', calendarError);
+          // Продолжаем обновление в БД даже при ошибке в Google Calendar
+        }
+      }
+      
+      // Обновляем статус события в базе данных
+      const updatedEvent = await prisma.event.update({
+        where: {
+          id: parseInt(eventId)
+        },
+        data: {
+          status: 'cancelled',
+          color: '#f44336' // Красный цвет для отмененных событий
+        }
+      });
+      
+      return {
+        success: true,
+        event: updatedEvent
+      };
+    } catch (error) {
+      console.error('Error cancelling event:', error);
+      reply.status(500).send({
+        success: false,
+        error: 'Не удалось отменить событие'
+      });
+    }
+  });
+  
   try {
     const port = process.env.PORT || 3001;
     await app.listen({ port: Number(port), host: '0.0.0.0' });

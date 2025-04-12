@@ -50,16 +50,21 @@
       <div v-else class="events-list">
         <div v-for="(event, index) in scheduledEvents" :key="event.id || index" class="event-item" :class="{ 'event-cancelled': event.status === 'cancelled' }">
           <div class="event-icon" :style="{ backgroundColor: event.color + '15', color: event.color }">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg v-if="event.status !== 'cancelled'" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
               <line x1="16" y1="2" x2="16" y2="6"></line>
               <line x1="8" y1="2" x2="8" y2="6"></line>
               <line x1="3" y1="10" x2="21" y2="10"></line>
             </svg>
+            <svg v-else xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="15" y1="9" x2="9" y2="15"></line>
+              <line x1="9" y1="9" x2="15" y2="15"></line>
+            </svg>
           </div>
           <div class="event-info">
             <div class="event-title-row">
-              <div class="event-title">{{ event.title }}</div>
+              <div class="event-title" :class="{ 'cancelled-text': event.status === 'cancelled' }">{{ event.title }}</div>
               <div v-if="event.status" class="event-status" :class="'status-' + event.status">
                 {{ getStatusText(event.status) }}
               </div>
@@ -77,7 +82,7 @@
           </div>
           <button 
             v-if="event.status !== 'cancelled'" 
-            @click="cancelEvent(event)" 
+            @click="cancelEvent(event.id)" 
             class="cancel-event-button"
             :disabled="isCancellingEvent"
           >
@@ -166,9 +171,29 @@ const isCancellingEvent = ref(false);
 
 // При монтировании компонента загружаем события пользователя
 onMounted(async () => {
+  // Проверяем наличие токена перед попыткой загрузки событий
+  const token = localStorage.getItem('authToken');
+  if (!token) {
+    console.error('Токен авторизации отсутствует при загрузке страницы');
+    showNotification('Требуется авторизация для загрузки данных', 'error');
+    return;
+  }
+  
+  // Обновляем заголовок авторизации в axios
+  if (window.axios) {
+    window.axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    console.log('Установлен заголовок авторизации при загрузке страницы');
+  }
+  
+  console.log('Токен авторизации:', token.substring(0, 10) + '...');
+  console.log('Пользователь:', user.value);
+  
   // Загружаем события, только если пользователь авторизован
   if (user.value && user.value.id) {
     await loadUserEvents();
+  } else {
+    console.error('Отсутствуют данные пользователя при загрузке страницы');
+    showNotification('Ошибка загрузки данных пользователя', 'error');
   }
 });
 
@@ -184,7 +209,10 @@ watch(() => user.value, async (newUser) => {
 
 // Функция для загрузки событий пользователя
 const loadUserEvents = async () => {
-  if (!user.value || !user.value.id) return;
+  if (!user.value || !user.value.id) {
+    console.error('Попытка загрузки событий без данных пользователя');
+    return;
+  }
   
   try {
     isLoadingEvents.value = true;
@@ -196,21 +224,50 @@ const loadUserEvents = async () => {
     // Формируем URL для запроса
     const url = `${baseUrl}/api/events?userId=${user.value.id}`;
     
-    // Получаем токен авторизации
-    const authToken = localStorage.getItem('authToken');
+    // Проверяем и получаем токен авторизации
+    let authToken;
+    
+    // Сначала проверяем localStorage
+    const storedToken = localStorage.getItem('authToken');
+    if (storedToken) {
+      authToken = storedToken;
+    }
+    // Затем проверяем axios headers
+    else if (window.axios?.defaults?.headers?.common?.['Authorization']) {
+      const authHeader = window.axios.defaults.headers.common['Authorization'];
+      if (authHeader.startsWith('Bearer ')) {
+        authToken = authHeader.substring(7);
+      }
+    }
+    
+    if (!authToken) {
+      console.error('Отсутствует токен авторизации для загрузки событий');
+      showNotification('Требуется авторизация для загрузки данных', 'error');
+      return;
+    }
     
     // Выполняем запрос к API
     const response = await fetch(url, {
       method: 'GET',
       headers: {
         'Accept': 'application/json',
-        ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
+        'Authorization': `Bearer ${authToken}`
       },
       credentials: 'include'
     });
     
     if (!response.ok) {
-      throw new Error(`Error loading events: ${response.status}`);
+      // Обрабатываем ошибки
+      if (response.status === 401) {
+        console.error('Ошибка авторизации при загрузке событий');
+        showNotification('Срок действия авторизации истек. Пожалуйста, войдите заново.', 'error');
+        // Очищаем текущий токен
+        localStorage.removeItem('authToken');
+        delete window.axios?.defaults?.headers?.common?.['Authorization'];
+        return;
+      } else {
+        throw new Error(`Error loading events: ${response.status}`);
+      }
     }
     
     const result = await response.json();
@@ -224,15 +281,20 @@ const loadUserEvents = async () => {
         color: event.color,
         status: event.status,
         staffInfo: event.staffInfo,
-        petBreed: event.petBreed
+        petBreed: event.petBreed,
+        googleEventId: event.googleEventId
       }));
       
       // Сортируем события по дате (от ближайшей к более поздней)
       scheduledEvents.value.sort((a, b) => new Date(a.date) - new Date(b.date));
+      
+      console.log('Загружено событий:', scheduledEvents.value.length);
+    } else {
+      console.warn('Нет данных о событиях или некорректный формат ответа:', result);
     }
   } catch (error) {
     console.error('Failed to load user events:', error);
-    showNotification('Не удалось загрузить ваши события', 'error');
+    showNotification('Не удалось загрузить ваши события: ' + error.message, 'error');
   } finally {
     isLoadingEvents.value = false;
   }
@@ -333,44 +395,134 @@ const formatTimeOnly = (date) => {
 const handleDebugLog = () => {};
 
 // Функция для отмены события
-const cancelEvent = async (event) => {
-  if (isCancellingEvent.value || !event.id) return;
-  
+const cancelEvent = async (eventId) => {
   try {
-    isCancellingEvent.value = true;
+    const token = localStorage.getItem('authToken');
     
-    // Получаем конфигурацию для API
-    const config = useRuntimeConfig();
-    const baseUrl = config.public.apiBaseUrl || 'https://maxzer.ru';
-    
-    // Формируем URL для запроса
-    const url = `${baseUrl}/api/events/${event.id}?userId=${user.value.id}`;
-    
-    // Получаем токен авторизации
-    const authToken = localStorage.getItem('authToken');
-    
-    // Выполняем запрос к API
-    const response = await fetch(url, {
-      method: 'DELETE',
-      headers: {
-        'Accept': 'application/json',
-        ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
-      },
-      credentials: 'include'
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Error cancelling event: ${response.status}`);
+    // Проверяем, есть ли токен авторизации
+    if (!token) {
+      showNotification('Ошибка авторизации: Токен не найден. Пожалуйста, войдите снова.', 'error');
+      console.error('Отсутствует токен авторизации');
+      return;
     }
     
-    // Показываем уведомление об успехе
-    showNotification('Событие успешно отменено');
+    // Добавляем предварительную проверку, чтобы пользователь подтвердил отмену
+    if (!confirm('Вы уверены, что хотите отменить это событие?')) {
+      return;
+    }
     
-    // Обновляем список событий
-    await loadUserEvents();
+    isCancellingEvent.value = true;
+    
+    // Первичная попытка отменить событие
+    let response;
+    try {
+      response = await fetch(`/api/events/${eventId}/cancel?userId=${user.value?.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          status: 'cancelled',
+          reason: 'cancelled_by_user'
+        })
+      });
+    } catch (networkError) {
+      console.error('Сетевая ошибка при отмене события:', networkError);
+      showNotification('Ошибка сети при отмене события. Проверьте подключение к интернету.', 'error');
+      isCancellingEvent.value = false;
+      return;
+    }
+    
+    // Обрабатываем 401 Unauthorized - пробуем обновить токен и повторить
+    if (response.status === 401) {
+      console.log('Получен 401 при отмене события, пробуем обновить токен');
+      
+      // Пытаемся обновить токен
+      const newToken = await refreshAuthToken();
+      
+      if (!newToken) {
+        console.error('Не удалось обновить токен авторизации');
+        showNotification('Ошибка авторизации. Пожалуйста, войдите снова.', 'error');
+        isCancellingEvent.value = false;
+        return;
+      }
+      
+      // Повторяем запрос с обновленным токеном
+      try {
+        response = await fetch(`/api/events/${eventId}/cancel?userId=${user.value?.id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${newToken}`
+          },
+          body: JSON.stringify({
+            status: 'cancelled',
+            reason: 'cancelled_by_user'
+          })
+        });
+      } catch (retryError) {
+        console.error('Ошибка при повторной попытке отменить событие:', retryError);
+        showNotification('Не удалось отменить событие после обновления токена.', 'error');
+        isCancellingEvent.value = false;
+        return;
+      }
+      
+      // Если и после обновления токена получаем 401, то это серьезная проблема авторизации
+      if (response.status === 401) {
+        console.error('Получен 401 даже после обновления токена');
+        showNotification('Серьезная ошибка авторизации. Пожалуйста, войдите снова или перезагрузите приложение.', 'error');
+        isCancellingEvent.value = false;
+        return;
+      }
+    }
+    
+    // Проверяем на другие ошибки
+    if (!response.ok) {
+      let errorText = `Ошибка при отмене события: ${response.status}`;
+      
+      try {
+        const errorData = await response.json();
+        if (errorData && errorData.message) {
+          errorText += ` - ${errorData.message}`;
+        }
+      } catch (jsonError) {
+        console.error('Не удалось распарсить ответ сервера:', jsonError);
+      }
+      
+      console.error(errorText);
+      showNotification(errorText, 'error');
+      isCancellingEvent.value = false;
+      return;
+    }
+    
+    // Обработка успешного ответа
+    try {
+      const data = await response.json();
+      
+      if (data && data.status === 'cancelled') {
+        // Обновляем событие в локальном массиве
+        const index = scheduledEvents.value.findIndex(event => event.id === eventId);
+        
+        if (index !== -1) {
+          scheduledEvents.value[index].status = 'cancelled';
+          scheduledEvents.value[index].color = 'red';
+        }
+        
+        // Уведомляем пользователя
+        showNotification('Событие успешно отменено', 'success');
+        console.log('Событие успешно отменено:', data);
+      } else {
+        console.warn('Неожиданный ответ сервера:', data);
+        showNotification('Событие было обработано, но произошла неожиданная ошибка. Обновите страницу.', 'warning');
+      }
+    } catch (parseError) {
+      console.error('Ошибка при обработке ответа сервера:', parseError);
+      showNotification('Ошибка при обработке ответа сервера. Но событие могло быть отменено.', 'warning');
+    }
   } catch (error) {
-    console.error('Failed to cancel event:', error);
-    showNotification('Не удалось отменить событие', 'error');
+    console.error('Непредвиденная ошибка при отмене события:', error);
+    showNotification(`Непредвиденная ошибка: ${error.message}`, 'error');
   } finally {
     isCancellingEvent.value = false;
   }
@@ -403,6 +555,110 @@ const getStaffName = (staffInfo) => {
   if (staffInfo.id === 'any') return 'Будет назначен';
   
   return '';
+};
+
+// Функция для обновления токена авторизации
+const refreshAuthToken = async () => {
+  try {
+    // Определяем, используется ли Telegram WebApp
+    const isTelegramApp = isTelegramWebAppAvailable && window.Telegram?.WebApp;
+    
+    let newToken = null;
+    
+    // Если доступен Telegram WebApp, используем его для обновления
+    if (isTelegramApp) {
+      console.log('Пытаемся обновить токен через Telegram WebApp');
+      
+      const tgWebApp = window.Telegram.WebApp;
+      
+      // Проверяем наличие initData
+      if (!tgWebApp.initData) {
+        console.error('Отсутствуют данные инициализации Telegram WebApp');
+        return null;
+      }
+      
+      // Извлекаем информацию о пользователе из initData
+      const userData = tgWebApp.initDataUnsafe?.user || {};
+      
+      // Создаем запрос для повторной авторизации
+      const authRequest = {
+        initData: tgWebApp.initData,
+        telegram_data: userData,
+        client_time: new Date().toISOString(),
+        action: 'refresh_token',
+        nonce: Math.random().toString(36).substring(2, 15)
+      };
+      
+      // Отправляем запрос на сервер
+      const response = await fetch('/api/auth/telegram', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        },
+        body: JSON.stringify(authRequest),
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Ошибка обновления Telegram токена: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data && data.accessToken) {
+        newToken = data.accessToken;
+      }
+    } else {
+      // Для обычной авторизации используем стандартный API
+      console.log('Пытаемся обновить токен через стандартный API');
+      
+      const response = await fetch('/api/auth/refresh-token', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Ошибка обновления стандартного токена: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data && data.accessToken) {
+        newToken = data.accessToken;
+      }
+    }
+    
+    // Если получен новый токен, сохраняем его
+    if (newToken) {
+      console.log('Получен новый токен:', newToken.substring(0, 10) + '...');
+      
+      // Сохраняем токен в localStorage
+      localStorage.setItem('authToken', newToken);
+      
+      // Обновляем заголовок авторизации в axios
+      if (window.axios) {
+        window.axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+      }
+      
+      // Небольшая задержка перед возвратом нового токена
+      await new Promise(resolve => setTimeout(resolve, 50));
+      
+      return newToken;
+    }
+  } catch (error) {
+    console.error('Ошибка при обновлении токена:', error);
+  }
+  
+  return null;
 };
 </script>
 
@@ -529,6 +785,17 @@ const getStaffName = (staffInfo) => {
 
 .event-cancelled {
   opacity: 0.6;
+  background-color: rgba(244, 67, 54, 0.08);
+}
+
+.cancelled-text {
+  text-decoration: line-through;
+  color: var(--tg-theme-hint-color, #9e9e9e);
+}
+
+.status-cancelled {
+  background-color: rgba(244, 67, 54, 0.15);
+  color: #ff6c5c;
 }
 
 .event-icon {
@@ -583,11 +850,6 @@ const getStaffName = (staffInfo) => {
 .status-pending {
   background-color: rgba(255, 152, 0, 0.15);
   color: #ffac33;
-}
-
-.status-cancelled {
-  background-color: rgba(244, 67, 54, 0.15);
-  color: #ff6c5c;
 }
 
 .event-datetime {
