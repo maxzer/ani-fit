@@ -250,27 +250,120 @@ async function handleLogin() {
       throw new Error('initData отсутствует');
     }
     
-    // Сохраняем данные для последующей отправки после ввода ФИО
-    telegramAuthData.value = {
+    // В первую очередь проверяем, существует ли пользователь с таким telegramId
+    console.log(`Проверяем существование пользователя с telegramId: ${telegramData.id}`);
+
+    // Формируем запрос для проверки пользователя - отправляем полный initData для безопасности
+    const checkUserRequest = {
       initData: rawInitData,
       telegram_data: telegramData,
-      client_time: new Date().toISOString(),
-      source: 'telegram_api_approach',
-      test_data: {
-        telegramUser: webAppData.user || null,
-        initDataPresent: !!rawInitData,
-        rawInitDataLength: rawInitData?.length || 0,
-        unsafeDataPresent: !!unsafeData,
-        telegramAvailable: !!window.Telegram?.WebApp
-      }
+      action: 'check_user',
+      client_time: new Date().toISOString()
     };
-    
-    // Переходим к шагу ввода ФИО
-    authStep.value = 'user-info';
-    isAuthenticating.value = false;
+
+    try {
+      console.log('Отправляем запрос на проверку пользователя');
+      const checkResponse = await axios.post(`${apiUrl}/api/auth/check-user`, checkUserRequest);
+      console.log('Получен ответ от check-user:', checkResponse.data);
+      
+      // Проверяем наличие ошибок в ответе
+      if (checkResponse.data && checkResponse.data.success === false) {
+        console.error('Сервер вернул ошибку при проверке пользователя:', checkResponse.data.error);
+        throw new Error(checkResponse.data.error || 'Неизвестная ошибка при проверке пользователя');
+      }
+      
+      // Если пользователь существует в базе данных, пропускаем шаг ввода ФИО
+      if (checkResponse.data && checkResponse.data.exists === true) {
+        console.log('Пользователь найден в базе данных, авторизуемся без ввода ФИО');
+        
+        // Формируем запрос для авторизации
+        const authRequest = {
+          initData: rawInitData,
+          telegram_data: telegramData,
+          client_time: new Date().toISOString(),
+          source: 'telegram_api_approach'
+        };
+        
+        // Отправляем запрос на авторизацию
+        console.log('Отправляем запрос на авторизацию');
+        const response = await axios.post(`${apiUrl}/api/auth/telegram`, authRequest);
+        console.log('Успешная авторизация');
+        
+        // Проверяем наличие ошибок в ответе
+        if (response.data && response.data.success === false) {
+          console.error('Сервер вернул ошибку при авторизации:', response.data.error);
+          throw new Error(response.data.error || 'Неизвестная ошибка при авторизации');
+        }
+        
+        if (response.data.accessToken) {
+          // Успешная авторизация
+          if (response.data.needsProfile) {
+            setTempAuth(response.data.accessToken, response.data.user);
+          } else {
+            setAuth(response.data.accessToken, response.data.user);
+          }
+          
+          // Обновляем UI
+          userData.value = response.data.user;
+          authData.value = response.data;
+        } else {
+          throw new Error('Не удалось получить токен авторизации');
+        }
+      } else {
+        console.log('Пользователь не найден в базе данных, показываем форму ввода ФИО');
+        
+        // Пользователя нет в базе, сохраняем данные и показываем форму ФИО
+        telegramAuthData.value = {
+          initData: rawInitData,
+          telegram_data: telegramData,
+          client_time: new Date().toISOString(),
+          source: 'telegram_api_approach'
+        };
+        
+        // Переходим к шагу ввода ФИО
+        authStep.value = 'user-info';
+      }
+    } catch (error) {
+      console.error('Ошибка при проверке пользователя:', error);
+      
+      // Детальное логирование ошибки axios
+      if (error.response) {
+        console.error('Данные ответа:', error.response.data);
+        console.error('Статус ответа:', error.response.status);
+        console.error('Заголовки ответа:', error.response.headers);
+      } else if (error.request) {
+        console.error('Запрос был отправлен, но не получен ответ', error.request);
+      } else {
+        console.error('Ошибка при настройке запроса:', error.message);
+      }
+      
+      if (error.response && error.response.status === 401) {
+        console.log('Ошибка авторизации (401), попробуем авторизоваться с запросом ФИО');
+        
+        // Даже в случае ошибки авторизации, сохраняем данные и переходим к форме ФИО
+        telegramAuthData.value = {
+          initData: rawInitData,
+          telegram_data: telegramData,
+          client_time: new Date().toISOString(),
+          source: 'telegram_api_approach'
+        };
+        
+        authStep.value = 'user-info';
+        return; // Прерываем выполнение, чтобы не попасть в основной обработчик ошибок
+      } else if (error.response && error.response.data) {
+        // Обрабатываем другие ошибки ответа сервера
+        console.error('Ошибка сервера:', error.response.data.error || 'Неизвестная ошибка сервера');
+        throw new Error(error.response.data.error || 'Ошибка при проверке пользователя');
+      } else {
+        // Если другая ошибка (не 401), перебрасываем в обработчик ошибок
+        throw error;
+      }
+    }
     
   } catch (error) {
+    console.error('Ошибка в handleLogin:', error);
     handleAuthError(error);
+  } finally {
     isAuthenticating.value = false;
   }
 }

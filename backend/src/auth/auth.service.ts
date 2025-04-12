@@ -83,19 +83,29 @@ export class AuthService {
 
       if (!user) {
         // Создаем пользователя, если не существует
+        // Используем as для приведения типа, так как поля ФИО добавлены в схему Prisma
+        const userData: any = {
+          telegramId: String(data.id),
+          firstName: data.first_name,
+          lastName: data.last_name || '',
+          username: data.username || '',
+          photoUrl: data.photo_url,
+          email: `telegram_${data.id}@example.com`, // Создаем фейковый email для совместимости
+        };
+
+        // Добавляем реальные ФИО, если они предоставлены
+        if (realNameData?.realName) {
+          userData.realName = realNameData.realName;
+        }
+        if (realNameData?.realLastName) {
+          userData.realLastName = realNameData.realLastName;
+        }
+        if (realNameData?.realPatronymic) {
+          userData.realPatronymic = realNameData.realPatronymic;
+        }
+
         user = await this.prisma.user.create({
-          data: {
-            telegramId: String(data.id),
-            firstName: data.first_name,
-            lastName: data.last_name || '',
-            username: data.username || '',
-            photoUrl: data.photo_url,
-            email: `telegram_${data.id}@example.com`, // Создаем фейковый email для совместимости
-            // Добавляем реальные ФИО, если они предоставлены
-            realName: realNameData?.realName || '',
-            realLastName: realNameData?.realLastName || '',
-            realPatronymic: realNameData?.realPatronymic || ''
-          }
+          data: userData
         });
       } else {
         // Обновляем данные пользователя
@@ -195,6 +205,39 @@ export class AuthService {
       }
     } catch (error) {
       throw new Error(`Failed to invalidate token: ${(error as Error).message}`);
+    }
+  }
+
+  // Метод для проверки существования пользователя
+  async checkUserExistence(telegramId: string): Promise<boolean> {
+    try {
+      console.log(`[AuthService] Checking existence for telegramId: ${telegramId}`);
+      
+      // Более тщательная проверка telegramId
+      if (!telegramId || telegramId === '' || telegramId === 'undefined' || telegramId === 'null') {
+        console.error('[AuthService] Error: Invalid telegramId provided to checkUserExistence:', telegramId);
+        return false;
+      }
+      
+      // Дополнительное логирование для отладки
+      console.log(`[AuthService] Finding user with telegramId: ${telegramId}`);
+      
+      // Ищем пользователя по telegramId
+      const user = await this.prisma.user.findFirst({
+        where: { telegramId: telegramId.toString() }
+      });
+      
+      if (user) {
+        console.log(`[AuthService] User found: ID=${user.id}, Name=${user.firstName} ${user.lastName}`);
+        return true;
+      } else {
+        console.log(`[AuthService] User with telegramId ${telegramId} not found in database`);
+        return false;
+      }
+    } catch (error) {
+      console.error('[AuthService] Error checking user existence:', error);
+      // В случае ошибки возвращаем false для безопасности
+      return false;
     }
   }
 } 

@@ -246,7 +246,7 @@ export function registerAuthMiddleware(fastify: FastifyInstance, prisma: PrismaC
     }
     
     // Пропускаем исключенные пути
-    if (excludePaths.includes(path)) {
+    if (excludePaths.some(excludePath => path === excludePath || path.startsWith(excludePath))) {
       done();
       return;
     }
@@ -258,7 +258,7 @@ export function registerAuthMiddleware(fastify: FastifyInstance, prisma: PrismaC
   // Добавляем middleware для проверки и обновления токенов на каждый запрос
   fastify.addHook('onRequest', async (request, reply) => {
     // Пропускаем исключенные пути
-    if (excludePaths.includes(request.routerPath)) {
+    if (excludePaths.some(excludePath => request.routerPath === excludePath || request.url === excludePath || request.url.startsWith(excludePath))) {
       return;
     }
 

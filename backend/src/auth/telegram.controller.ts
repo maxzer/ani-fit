@@ -12,6 +12,12 @@ interface TelegramAuthRequest {
   real_patronymic?: string;
 }
 
+interface TelegramCheckRequest {
+  initData: string;
+  telegram_data?: any;
+  action: string;
+}
+
 export default async function telegramAuthController(fastify: FastifyInstance, prisma: PrismaClient) {
   const authService = new AuthService(prisma);
 
@@ -23,6 +29,102 @@ export default async function telegramAuthController(fastify: FastifyInstance, p
     path: '/',
     domain: process.env.COOKIE_DOMAIN || undefined
   };
+
+  // Добавляем маршрут для проверки существования пользователя
+  fastify.post<{ Body: TelegramCheckRequest }>('/api/auth/check-user', {
+    schema: {
+      body: {
+        type: 'object',
+        required: ['telegram_data', 'action'],
+        properties: {
+          initData: { type: 'string' },
+          telegram_data: { 
+            type: 'object',
+            required: ['id']
+          },
+          action: { type: 'string' }
+        }
+      }
+    },
+    config: {
+      cors: {
+        origin: ['https://maxzer.ru', 'https://www.maxzer.ru', 'http://localhost:3000'],
+        credentials: true
+      }
+    },
+    handler: async (request, reply) => {
+      try {
+        console.log('===== TELEGRAM CHECK USER ENDPOINT START =====');
+        console.log('Request body received for check-user');
+        console.log('Request headers:', request.headers);
+        console.log('Request body:', request.body);
+        
+        let telegramId = '';
+        let isFullyAuthorized = false;
+        
+        // Шаг 1: Попытка валидировать initData (безопасный путь)
+        if (request.body.initData) {
+          try {
+            // Пытаемся выполнить полную валидацию
+            const userData = await authService.validateInitData(request.body.initData);
+            telegramId = String(userData.id || '');
+            console.log(`Successfully validated initData, telegramId: ${telegramId}`);
+            isFullyAuthorized = true;
+          } catch (validationError) {
+            console.warn('Could not validate initData, will try fallback method:', 
+              validationError instanceof Error ? validationError.message : String(validationError));
+            // Не выбрасываем ошибку, продолжим с запасным вариантом
+          }
+        }
+        
+        // Шаг 2: Если не удалось получить telegramId через валидацию, 
+        // используем id из telegram_data (запасной путь)
+        if (!telegramId && request.body.telegram_data && request.body.telegram_data.id) {
+          telegramId = String(request.body.telegram_data.id);
+          console.log(`Using telegram_data.id as fallback: ${telegramId}`);
+        }
+        
+        // Если всё ещё нет telegramId, возвращаем ошибку
+        if (!telegramId) {
+          console.error('No valid Telegram ID found in request');
+          return reply.code(200).send({
+            success: false,
+            error: 'No valid Telegram ID provided',
+            exists: false,
+            timestamp: new Date().toISOString()
+          });
+        }
+        
+        // Проверяем существование пользователя
+        const userExists = await authService.checkUserExistence(telegramId);
+        console.log(`User exists in database: ${userExists}`);
+        
+        // Отправляем результат проверки
+        const responseData = {
+          exists: userExists,
+          telegramId: telegramId,
+          success: true,
+          isFullyAuthorized, // Флаг указывает, был ли initData валидирован успешно
+          timestamp: new Date().toISOString()
+        };
+        
+        console.log('Success response:', responseData);
+        return reply.code(200).send(responseData);
+      } catch (error) {
+        console.error('===== TELEGRAM CHECK USER ERROR =====');
+        console.error('Error message:', (error as Error).message);
+        console.error('Error stack:', (error as Error).stack);
+        
+        // Всегда возвращаем код 200 с данными об ошибке, чтобы клиент мог нормально обработать ответ
+        return reply.code(200).send({
+          success: false,
+          error: (error as Error).message,
+          exists: false,
+          timestamp: new Date().toISOString()
+        });
+      }
+    }
+  });
 
   // Добавляем маршрут для аутентификации через Telegram
   fastify.post<{ Body: TelegramAuthRequest }>('/api/auth/telegram', {
@@ -130,32 +232,22 @@ export default async function telegramAuthController(fastify: FastifyInstance, p
         console.error('Error stack:', (error as Error).stack);
         console.error('==============================');
         
-        // Обработка ошибок
+        // Обработка ошибок - всегда возвращаем код 200 для клиентской обработки
+        let errorType = 'Unknown';
+        
         if (error instanceof InvalidTelegramDataError) {
-          return reply.code(401).send({ 
-            success: false, 
-            error: error.message,
-            errorType: 'InvalidTelegramData'
-          });
+          errorType = 'InvalidTelegramData';
         } else if (error instanceof UserCreationError) {
-          return reply.code(500).send({ 
-            success: false, 
-            error: error.message,
-            errorType: 'UserCreation'
-          });
+          errorType = 'UserCreation';
         } else if (error instanceof TokenGenerationError) {
-          return reply.code(500).send({ 
-            success: false, 
-            error: error.message,
-            errorType: 'TokenGeneration'
-          });
+          errorType = 'TokenGeneration';
         }
         
-        return reply.code(500).send({ 
+        return reply.code(200).send({ 
           success: false, 
-          error: 'Unexpected error',
-          errorType: 'Unknown',
-          message: (error as Error).message
+          error: (error as Error).message,
+          errorType: errorType,
+          timestamp: new Date().toISOString()
         });
       }
     }
