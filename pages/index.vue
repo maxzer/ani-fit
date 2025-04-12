@@ -5,7 +5,10 @@
         <img :src="user.photoUrl" alt="Аватар" />
       </div>
       <div class="user-details">
-        <div class="section-title">Добро пожаловать, {{ user.firstName }}!</div>
+        <div class="welcome-container">
+          <div class="welcome-text">Добро пожаловать</div>
+          <div class="user-name">{{ user.realName || user.firstName }}</div>
+        </div>
         <button @click="handleLogout" class="logout-button">
           <svg class="logout-icon" viewBox="0 0 24 24">
             <path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"></path>
@@ -126,10 +129,21 @@ const notification = ref({
 
 // Обработчик выхода из аккаунта
 const handleLogout = () => {
+  // Выполняем логаут
   logout();
   
   // Показываем уведомление
   showNotification('Вы успешно вышли из аккаунта', 'info');
+  
+  // Добавляем задержку перед закрытием приложения (1.5 секунды),
+  // чтобы пользователь успел увидеть уведомление
+  setTimeout(() => {
+    // Проверяем доступность Telegram WebApp API
+    if (window.Telegram && window.Telegram.WebApp) {
+      // Закрываем приложение
+      window.Telegram.WebApp.close();
+    }
+  }, 1500);
 };
 
 // Функция для показа нативного уведомления
@@ -239,6 +253,23 @@ const handleDebugLog = () => {};
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.welcome-container {
+  display: flex;
+  flex-direction: column;
+}
+
+.welcome-text {
+  font-size: 14px;
+  color: var(--tg-theme-hint-color, #9e9e9e);
+  margin-bottom: 4px;
+}
+
+.user-name {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--tg-theme-text-color, #ffffff);
 }
 
 .logout-button {
