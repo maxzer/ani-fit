@@ -15,16 +15,18 @@
         :title="title"
         :show-date-picker="true"
         :color="color"
+        :is-price-list-viewed="isPriceListViewed"
         @close="closePopup"
         @dateConfirmed="handleDateConfirmed"
         @debug-log="handleDebugLog"
+        @price-list-viewed="markPriceListAsViewed"
       />
     </Teleport>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, inject } from 'vue';
 import CardPopup from './CardPopup.vue';
 
 const props = defineProps({
@@ -46,13 +48,17 @@ const props = defineProps({
   }
 });
 
-const emit = defineEmits(['dateSelected', 'debug-log']);
+const emit = defineEmits(['dateSelected', 'debug-log', 'priceListViewed']);
 const imageExists = ref(false);
 const isPopupVisible = ref(false);
 const selectedDate = ref(null);
+const isPriceListViewed = ref(false);
 
-// Проверка существования изображения
-onMounted(() => {
+// Получаем данные пользователя из глобального состояния
+const user = inject('user', null);
+
+// Проверка существования изображения и загрузка статуса просмотра прайс-листа
+onMounted(async () => {
   if (props.image) {
     const img = new Image();
     img.onload = () => {
@@ -60,10 +66,101 @@ onMounted(() => {
     };
     img.src = props.image;
   }
+  
+  // Загружаем статус просмотра прайс-листа, если пользователь авторизован
+  if (user.value && user.value.id) {
+    await loadPriceListViewStatus();
+  }
 });
+
+// Загрузка статуса просмотра прайс-листа
+const loadPriceListViewStatus = async () => {
+  try {
+    const baseUrl = window.location.origin;
+    const url = `${baseUrl}/api/price-lists/viewed?userId=${user.value.id}`;
+    
+    // Получаем токен авторизации
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      console.error('Нет токена авторизации для загрузки статуса просмотра прайс-листа');
+      return;
+    }
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Ошибка загрузки статуса просмотра прайс-листа: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    if (data.success && Array.isArray(data.viewedPriceLists)) {
+      // Ищем запись для текущей услуги
+      const serviceStatus = data.viewedPriceLists.find(item => item.serviceTitle === props.title);
+      isPriceListViewed.value = serviceStatus ? serviceStatus.isViewed : false;
+    }
+  } catch (error) {
+    console.error('Ошибка при загрузке статуса просмотра прайс-листа:', error);
+  }
+};
+
+// Отметка прайс-листа как просмотренного
+const markPriceListAsViewed = async () => {
+  try {
+    if (!user.value || !user.value.id) {
+      console.error('Пользователь не авторизован');
+      return;
+    }
+    
+    const baseUrl = window.location.origin;
+    const url = `${baseUrl}/api/price-lists/mark-viewed`;
+    
+    // Получаем токен авторизации
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      console.error('Нет токена авторизации для отметки просмотра прайс-листа');
+      return;
+    }
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        userId: user.value.id,
+        serviceTitle: props.title
+      })
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Ошибка отметки просмотра прайс-листа: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    if (data.success) {
+      isPriceListViewed.value = true;
+      emit('priceListViewed', props.title);
+    }
+  } catch (error) {
+    console.error('Ошибка при отметке просмотра прайс-листа:', error);
+  }
+};
 
 // Обработчик подтверждения даты
 const handleDateConfirmed = (event) => {
+  // Проверяем, просмотрен ли прайс-лист
+  if (!isPriceListViewed.value) {
+    console.warn('Попытка записи без просмотра прайс-листа. Запись отклонена.');
+    return;
+  }
+  
   closePopup();
   selectedDate.value = event.date;
   emit('dateSelected', {

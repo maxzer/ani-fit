@@ -1,5 +1,5 @@
 <template>
-  <div class="date-picker-container">
+  <div class="date-picker-container" :class="{ 'disabled': disabled }">
     <VDatePicker
       v-model="selectedDate"
       :masks="masks"
@@ -35,6 +35,29 @@
       :isStaffSelected="!!props.staffInfo && !!props.staffInfo.id"
       @confirm="confirmDate"
     />
+    
+    <!-- Блокирующий оверлей, когда компонент отключен -->
+    <div v-if="disabled" class="disabled-overlay">
+      <div class="disabled-message">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+        <span>Просмотрите прайс-лист перед записью</span>
+      </div>
+    </div>
+    
+    <!-- Кнопка подтверждения -->
+    <button 
+      v-if="showConfirmButton" 
+      @click="confirmSelectedDate" 
+      class="confirm-button" 
+      :disabled="!selectedTimeSlot || disabled"
+      :style="{ backgroundColor: disabled ? '#cccccc' : color }"
+    >
+      Подтвердить {{ selectedTimeSlot ? formatDisplayTime(selectedTimeSlot) : '' }}
+    </button>
   </div>
 </template>
 
@@ -57,11 +80,19 @@ const props = defineProps({
   organizerLocation: { type: String, default: 'AniFit' },
   userEmail: { type: String, default: '' },
   staffInfo: { type: Object, default: null },
-  petBreed: { type: String, default: '' }
+  petBreed: {
+    type: String,
+    default: ''
+  },
+  // Флаг отключения компонента (если прайс-лист не просмотрен)
+  disabled: {
+    type: Boolean,
+    default: false
+  }
 });
 
 // События
-const emit = defineEmits(['dateSelected', 'confirmed']);
+const emit = defineEmits(['dateSelected', 'confirmed', 'debug-log']);
 
 // Состояние компонента
 const selectedDate = ref(null);
@@ -806,6 +837,36 @@ const saveEventToDatabase = async (eventData) => {
     console.error('Exception saving event to database:', error);
   }
 };
+
+// Обработчик выбора и подтверждения даты
+const confirmSelectedDate = () => {
+  if (props.disabled) {
+    // Если компонент отключен, блокируем подтверждение даты
+    emit('debug-log', {
+      level: 'warn',
+      message: 'Attempt to confirm date while component is disabled',
+      context: 'DatePicker'
+    });
+    return;
+  }
+  
+  if (!selectedTimeSlot.value) {
+    showNotification('Сначала выберите время', 'warning');
+    emit('debug-log', {
+      level: 'warn',
+      message: 'User attempted to confirm without selecting a time slot',
+      context: 'DatePicker'
+    });
+    return;
+  }
+
+  isCreatingEvent.value = true;
+  
+  const dateString = selectedTimeSlot.value;
+  const selectedDateTime = new Date(dateString);
+  
+  // ... existing code ...
+};
 </script>
 
 <style scoped>
@@ -1004,4 +1065,50 @@ const saveEventToDatabase = async (eventData) => {
 :deep(.vc-weeks .vc-week:last-child) {
   display: none !important;
 }
+
+.disabled {
+  position: relative;
+  pointer-events: none;
+  opacity: 0.8;
+}
+
+.disabled-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  border-radius: 12px;
+}
+
+.disabled-message {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+  padding: 20px;
+  background-color: rgba(255, 255, 255, 0.9);
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.disabled-message svg {
+  color: #ff9800;
+  width: 40px;
+  height: 40px;
+}
+
+.disabled-message span {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--tg-theme-text-color, #333333);
+}
+
+/* ... existing styles ... */
 </style> 

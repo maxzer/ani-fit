@@ -13,20 +13,26 @@ npx prisma generate
 echo "Waiting for database..."
 sleep 5
 
-# Очищаем директорию миграций если она существует
-echo "Cleaning migrations directory..."
-rm -rf prisma/migrations/*
+# Проверяем, инициализирована ли база данных
+echo "Checking database status..."
+DB_EXISTS=$(npx prisma migrate status | grep -c "Database schema is up to date")
 
-# Сбрасываем и инициализируем базу данных
-echo "Resetting database..."
-npx prisma migrate reset --force
-
-# Создаем и применяем миграции
-echo "Creating initial migration..."
-npx prisma migrate dev --name init --create-only
-
-echo "Applying migrations..."
-npx prisma migrate deploy
+if [ "$DB_EXISTS" -eq 0 ]; then
+  # База данных не инициализирована, выполняем полную настройку
+  echo "Database not initialized, setting up..."
+  
+  # Применяем существующие миграции или создаем новую если их нет
+  if [ -z "$(ls -A prisma/migrations 2>/dev/null)" ]; then
+    echo "Creating initial migration..."
+    npx prisma migrate dev --name init --create-only
+  fi
+  
+  echo "Applying migrations..."
+  npx prisma migrate deploy
+else
+  echo "Database already initialized, applying any pending migrations..."
+  npx prisma migrate deploy
+fi
 
 # Запускаем приложение
 echo "Starting application..."

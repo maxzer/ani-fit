@@ -27,6 +27,7 @@ model User {
   auth       Auth?
   sessions   Session[]
   events     Event[]
+  viewedPriceLists ViewedPriceList[] // Связь с просмотренными прайс-листами
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -79,4 +80,21 @@ model Event {
   updatedAt   DateTime @updatedAt
 
   @@map("events")
+} 
+
+// Модель для просмотренных прайс-листов услуг
+model ViewedPriceList {
+  id          Int      @id @default(autoincrement())
+  serviceTitle String   // Название услуги/карточки
+  isViewed    Boolean  @default(false)
+  
+  // Связь с пользователем
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, serviceTitle]) // Уникальное ограничение для пары пользователь-услуга
+  @@map("viewed_price_lists")
 } 

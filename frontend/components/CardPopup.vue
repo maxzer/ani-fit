@@ -9,6 +9,7 @@
               v-if="activeView === 'booking'" 
               class="price-list-button" 
               @click="showPriceList"
+              :class="{ 'pulse-button': !isPriceListViewed }"
               :style="{ color: color }"
             >
               Прайс-лист
@@ -24,6 +25,16 @@
         <div class="popup-body">
           <!-- Содержимое для режима бронирования -->
           <div v-if="activeView === 'booking'">
+            <!-- Предупреждение если прайс-лист не просмотрен -->
+            <div v-if="!isPriceListViewed" class="price-list-warning" :style="{ borderColor: color + '50' }">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+              </svg>
+              <span>Пожалуйста, ознакомьтесь с прайс-листом перед записью</span>
+            </div>
+            
             <!-- Строка с выбором специалиста и вводом породы -->
             <div class="input-row">
               <div class="input-col">
@@ -63,6 +74,7 @@
               :userEmail="userEmail"
               :staffInfo="staffInfo"
               :petBreed="petBreed"
+              :disabled="!isPriceListViewed"
             />
           </div>
           
@@ -116,7 +128,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue';
+import { ref, watch, computed } from 'vue';
 import DatePicker from './DatePicker.vue';
 import StaffSelector from './StaffSelector.vue';
 
@@ -140,10 +152,14 @@ const props = defineProps({
   userEmail: {
     type: String,
     default: ''
+  },
+  isPriceListViewed: {
+    type: Boolean,
+    default: false
   }
 });
 
-const emit = defineEmits(['close', 'dateConfirmed', 'debug-log']);
+const emit = defineEmits(['close', 'dateConfirmed', 'debug-log', 'price-list-viewed']);
 
 // Состояние для отслеживания выбранной даты
 const selectedDate = ref(null);
@@ -163,6 +179,11 @@ const notification = ref({
   show: false,
   message: '',
   type: 'success'
+});
+
+// Вычисляемое свойство для кнопки записи
+const isBookingDisabled = computed(() => {
+  return !props.isPriceListViewed && activeView.value === 'booking';
 });
 
 // Показать уведомление
@@ -205,6 +226,12 @@ const handleDateConfirmed = (dateObj, eventLink = null, errorMessage = null) => 
   // Проверка, выбран ли сотрудник (усиленная проверка)
   if (!staffInfo.value || !staffInfo.value.id) {
     showNotification('Пожалуйста, выберите специалиста перед подтверждением', 'error');
+    return;
+  }
+  
+  // Проверка, просмотрен ли прайс-лист
+  if (!props.isPriceListViewed) {
+    showNotification('Пожалуйста, просмотрите прайс-лист перед записью', 'error');
     return;
   }
   
@@ -280,6 +307,11 @@ const showPriceList = () => {
 };
 
 const showBooking = () => {
+  // При возврате к экрану бронирования сообщаем родительскому компоненту,
+  // что прайс-лист был просмотрен
+  if (activeView.value === 'pricelist') {
+    emit('price-list-viewed');
+  }
   activeView.value = 'booking';
 };
 
@@ -687,6 +719,40 @@ const getPriceList = () => {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+.price-list-warning {
+  margin-bottom: 15px;
+  padding: 12px;
+  border-radius: 8px;
+  background-color: rgba(255, 152, 0, 0.1);
+  border: 1px solid;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--tg-theme-text-color, #333);
+}
+
+.price-list-warning svg {
+  flex-shrink: 0;
+  color: #ff9800;
+}
+
+.pulse-button {
+  animation: pulse-outline 2s infinite;
+}
+
+@keyframes pulse-outline {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 152, 0, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(255, 152, 0, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 152, 0, 0);
   }
 }
 </style> 
