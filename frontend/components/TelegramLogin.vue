@@ -57,63 +57,13 @@
     </div>
     
     <!-- Шаг 2: Экран ввода ФИО -->
-    <div v-if="authStep === 'user-info'" class="user-info-form">
-      <h2 class="login-title">Введите ваши ФИО</h2>
-      
-      <div class="user-info-form__content">
-        <div class="form-group">
-          <label>Имя</label>
-          <input 
-            v-model="userRealName.firstName" 
-            type="text" 
-            placeholder="Введите имя"
-            class="form-input"
-          />
-        </div>
-        <div class="form-group">
-          <label>Фамилия</label>
-          <input 
-            v-model="userRealName.lastName" 
-            type="text" 
-            placeholder="Введите фамилию"
-            class="form-input"
-          />
-        </div>
-        <div class="form-group">
-          <label>Отчество</label>
-          <input 
-            v-model="userRealName.patronymic" 
-            type="text" 
-            placeholder="Введите отчество (при наличии)"
-            class="form-input"
-          />
-        </div>
-        
-        <div class="user-info-form__actions">
-          <button 
-            @click="goBackToInitial" 
-            class="cancel-button"
-          >
-            Назад
-          </button>
-          <button 
-            @click="submitUserInfo" 
-            class="submit-button"
-            :disabled="!isUserInfoValid || isAuthenticating"
-          >
-            <span v-if="isAuthenticating">
-              <svg class="spinner" viewBox="0 0 50 50">
-                <circle class="path" cx="25" cy="25" r="20" fill="none" stroke-width="5"></circle>
-              </svg>
-              Отправка...
-            </span>
-            <span v-else>
-              Продолжить
-            </span>
-          </button>
-        </div>
-      </div>
-    </div>
+    <UserInfoForm 
+      v-if="authStep === 'user-info'"
+      :initialData="userRealName"
+      :isSubmitting="isAuthenticating"
+      @submit="handleUserInfoSubmit"
+      @cancel="goBackToInitial" 
+    />
     
     <!-- Отображение ошибки -->
     <div v-if="errorMessage" class="auth-error">
@@ -130,6 +80,7 @@ import { ref, inject, computed, onMounted } from 'vue';
 import axios from 'axios';
 import { useRuntimeConfig } from '#app';
 import { getInitData } from '../utils/telegram.js';
+import UserInfoForm from './UserInfoForm.vue';
 
 // Получение конфигурации и URL API
 const config = useRuntimeConfig();
@@ -380,11 +331,7 @@ function goBackToInitial() {
 }
 
 // Функция для отправки данных с ФИО
-async function submitUserInfo() {
-  if (!isUserInfoValid.value) {
-    return;
-  }
-  
+async function handleUserInfoSubmit(data) {
   try {
     isAuthenticating.value = true;
     
@@ -395,9 +342,9 @@ async function submitUserInfo() {
     // Добавляем ФИО к запросу
     const authRequest = {
       ...telegramAuthData.value,
-      real_name: userRealName.value.firstName,
-      real_lastname: userRealName.value.lastName,
-      real_patronymic: userRealName.value.patronymic || ''
+      real_name: data.firstName,
+      real_lastname: data.lastName,
+      real_patronymic: data.patronymic || ''
     };
     
     // Отправляем запрос на API
@@ -666,87 +613,5 @@ const clearError = () => {
 
 .retry-button:hover {
   background-color: rgba(51, 144, 236, 0.1);
-}
-
-/* Стили для формы ввода ФИО как отдельного шага */
-.user-info-form {
-  width: 100%;
-}
-
-.user-info-form__content {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.form-group label {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--tg-theme-hint-color, #999999);
-}
-
-.form-input {
-  padding: 12px;
-  border-radius: 8px;
-  border: 1px solid var(--tg-theme-hint-color, #dcdcdc);
-  background-color: var(--tg-theme-secondary-bg-color, #f5f5f5);
-  color: var(--tg-theme-text-color, #000000);
-  font-size: 16px;
-  outline: none;
-  transition: border-color 0.2s ease;
-}
-
-.form-input:focus {
-  border-color: var(--tg-theme-button-color, #2481cc);
-}
-
-.user-info-form__actions {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 24px;
-  gap: 12px;
-}
-
-.cancel-button, .submit-button {
-  padding: 12px 20px;
-  border-radius: 8px;
-  font-size: 16px;
-  font-weight: 500;
-  cursor: pointer;
-  flex: 1;
-  transition: background-color 0.2s ease;
-  border: none;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.cancel-button {
-  background-color: var(--tg-theme-secondary-bg-color, #f5f5f5);
-  color: var(--tg-theme-text-color, #000000);
-}
-
-.submit-button {
-  background-color: var(--tg-theme-button-color, #2481cc);
-  color: var(--tg-theme-button-text-color, #ffffff);
-}
-
-.submit-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.cancel-button:hover {
-  background-color: var(--tg-theme-bg-color, #e5e5e5);
-}
-
-.submit-button:hover:not(:disabled) {
-  background-color: var(--tg-theme-button-color, #1a6aaa);
 }
 </style> 

@@ -1,70 +1,11 @@
 <template>
   <div class="app-container" :data-theme="theme?.colorScheme || 'light'">
-    <!-- Отладочная панель -->
-    <!-- <div class="debug-panel" :class="{ 'debug-panel--expanded': isDebugExpanded }"> -->
-      <!-- <div class="debug-panel__header" @click="toggleDebugPanel"> -->
-        <!-- <span>Отладочная информация</span> -->
-        <!-- <span class="debug-panel__toggle">{{ isDebugExpanded ? '▼' : '▲' }}</span> -->
-      <!-- </div> -->
-      <!-- <div v-if="isDebugExpanded" class="debug-panel__content">
-        <div class="debug-panel__section">
-          <h3>Состояние приложения</h3>
-          <table class="debug-table">
-            <tr>
-              <td>WebApp доступен:</td>
-              <td>{{ isTelegramWebAppAvailable }}</td>
-            </tr>
-            <tr>
-              <td>Загрузка:</td>
-              <td>{{ isLoading }}</td>
-            </tr>
-            <tr>
-              <td>Тестовый режим:</td>
-              <td>{{ isTestMode }}</td>
-            </tr>
-            <tr>
-              <td>Авторизован:</td>
-              <td>{{ isAuthenticated }}</td>
-            </tr>
-            <tr>
-              <td>Нужен профиль:</td>
-              <td>{{ needsProfile }}</td>
-            </tr>
-            <tr>
-              <td>Последняя ошибка:</td>
-              <td>{{ lastError || 'нет' }}</td>
-            </tr>
-          </table>
-        </div>
-        
-        <div class="debug-panel__section">
-          <h3>Данные инициализации</h3>
-          <pre class="debug-pre">{{ initData ? JSON.stringify(initData, null, 2) : 'отсутствуют' }}</pre>
-        </div>
-        
-        <div class="debug-panel__section">
-          <h3>Пользователь</h3>
-          <pre class="debug-pre">{{ user ? JSON.stringify(user, null, 2) : 'не авторизован' }}</pre>
-        </div>
-        
-        <div class="debug-panel__section">
-          <h3>События</h3>
-          <div class="debug-logs">
-            <div v-for="(log, index) in logEvents" :key="index" class="debug-log">
-              {{ log.time }} - {{ log.message }}
-            </div>
-          </div>
-        </div>
-      </div> -->
-    <!-- </div> -->
-
     <div v-if="!isLoading && isTelegramWebAppAvailable && initData">
       <div v-if="isTestMode" class="test-mode-badge">Тестовый режим</div>
       
       <!-- Если не авторизован, показываем компонент авторизации -->
       <div v-if="!isAuthenticated">
-        <TelegramLogin v-if="!needsProfile" />
-        <ProfileForm v-else />
+        <TelegramLogin />
       </div>
       <!-- Иначе показываем основное содержимое -->
       <NuxtPage v-else />
@@ -86,7 +27,6 @@
 import { ref, onMounted, reactive, provide, computed, watch, onBeforeUnmount } from 'vue';
 import { getTelegramTheme, isTelegramWebAppReady, getInitData } from './utils/telegram.js';
 import TelegramLogin from './components/TelegramLogin.vue';
-import ProfileForm from './components/ProfileForm.vue';
 import '@/assets/css/theme.css';
 import axios from 'axios';
 
