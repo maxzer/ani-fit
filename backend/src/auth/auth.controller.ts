@@ -1,13 +1,12 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
+import { JWT } from '@fastify/jwt';
 
 // Расширяем интерфейс FastifyInstance для поддержки jwt
 declare module 'fastify' {
   interface FastifyInstance {
-    jwt: {
-      sign: (payload: any, options?: any) => string;
-    };
+    jwt: JWT;
   }
 }
 
