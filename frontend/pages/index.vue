@@ -1,7 +1,7 @@
 <template>
   <div class="main-page">
     <div v-if="user" class="user-info">
-      <div class="user-avatar" v-if="user.photoUrl">
+      <div class="user-avatar" v-if="user.photoUrl" @click="navigateToProfile">
         <img :src="user.photoUrl" alt="Аватар" />
       </div>
       <div class="user-details">
@@ -48,7 +48,7 @@
       </div>
       
       <div v-else class="events-list">
-        <div v-for="(event, index) in scheduledEvents" :key="event.id || index" class="event-item" :class="{ 'event-cancelled': event.status === 'cancelled' }">
+        <div v-for="(event, index) in filteredEvents" :key="event.id || index" class="event-item" :class="{ 'event-cancelled': event.status === 'cancelled' }">
           <div class="event-icon" :style="{ backgroundColor: event.color + '15', color: event.color }">
             <svg v-if="event.status !== 'cancelled'" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
@@ -166,6 +166,14 @@ const notification = ref({
 // Состояние для загрузки и отмены событий
 const isLoadingEvents = ref(false);
 const isCancellingEvent = ref(false);
+
+// Вычисляемое свойство для фильтрации не более 5 последних событий
+const filteredEvents = computed(() => {
+  // Сначала сортируем по дате (от новых к старым)
+  return [...scheduledEvents.value]
+    .sort((a, b) => new Date(b.date) - new Date(a.date))
+    .slice(0, 5);
+});
 
 // При монтировании компонента загружаем события пользователя
 onMounted(async () => {
@@ -687,6 +695,11 @@ const resetAuth = () => {
     logout();
   }
 };
+
+// Функция для перехода на страницу профиля
+const navigateToProfile = () => {
+  navigateTo('/profile');
+};
 </script>
 
 <style scoped>
@@ -712,6 +725,14 @@ const resetAuth = () => {
   border-radius: 50%;
   overflow: hidden;
   margin-right: 12px;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.user-avatar:hover {
+  border-color: var(--tg-theme-button-color, #3390ec);
+  transform: scale(1.05);
 }
 
 .user-avatar img {
