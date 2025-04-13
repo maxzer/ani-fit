@@ -9,26 +9,24 @@
       class="confirm-button" 
       @click="$emit('confirm')" 
       :disabled="isLoading || !isStaffSelected"
-      :class="{ 'loading': isLoading, 'disabled': !isStaffSelected }"
+      :class="{ 'loading': isLoading, 'disabled': !isStaffSelected, 'warning': !isStaffSelected }"
       :style="{ 
         backgroundColor: isLoading ? 'var(--tg-theme-secondary-bg-color, #f0f0f0)' : 
-          !isStaffSelected ? '#f44336' : color,
-        opacity: !isStaffSelected ? '0.9' : '1',
-        boxShadow: !isStaffSelected ? '0 4px 12px rgba(244, 67, 54, 0.3)' : '0 4px 8px rgba(0, 0, 0, 0.15)'
+          !isStaffSelected ? '#ff9800' : color,
+        opacity: !isStaffSelected ? '1' : '1',
+        boxShadow: !isStaffSelected ? '0 4px 12px rgba(255, 152, 0, 0.4)' : '0 4px 8px rgba(0, 0, 0, 0.15)'
       }"
     >
-      <span v-if="!isLoading">{{ !isStaffSelected ? 'Выберите специалиста' : 'Подтвердить' }}</span>
+      <span v-if="!isLoading">
+        <svg v-if="!isStaffSelected" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px;">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+        {{ !isStaffSelected ? 'Выберите специалиста' : 'Подтвердить' }}
+      </span>
       <span v-else class="button-spinner">Обработка...</span>
     </button>
-    
-    <div v-if="!isStaffSelected" class="confirm-message">
-      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f44336" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="10"></circle>
-        <line x1="12" y1="8" x2="12" y2="12"></line>
-        <line x1="12" y1="16" x2="12.01" y2="16"></line>
-      </svg>
-      <span>Для продолжения необходимо выбрать специалиста</span>
-    </div>
   </div>
 </template>
 
@@ -105,8 +103,12 @@ defineEmits(['confirm']);
 }
 
 .confirm-button:disabled {
-  opacity: 0.9;
+  opacity: 1;
   cursor: not-allowed;
+}
+
+.confirm-button.warning {
+  animation: pulseButton 2s infinite;
 }
 
 .confirm-button.loading {
@@ -134,20 +136,6 @@ defineEmits(['confirm']);
   to {
     transform: rotate(360deg);
   }
-}
-
-.confirm-message {
-  font-size: 13px;
-  color: #f44336;
-  text-align: center;
-  margin-top: 8px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.confirm-message span {
-  margin-left: 8px;
 }
 
 @keyframes fadeIn {

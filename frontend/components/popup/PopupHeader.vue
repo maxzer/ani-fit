@@ -6,10 +6,21 @@
         v-if="activeView === 'booking'" 
         class="price-list-button" 
         @click="$emit('show-price-list')"
-        :class="{ 'pulse-button': !isPriceListViewed }"
-        :style="{ color: color }"
+        :class="{ 'highlight-button': !isPriceListViewed }"
+        :style="{ 
+          color: !isPriceListViewed ? '#ffffff' : color,
+          backgroundColor: !isPriceListViewed ? color : color + '15'
+        }"
       >
+        <svg v-if="!isPriceListViewed" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 5px;">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
         Прайс-лист
+        <svg v-if="!isPriceListViewed" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 5px;">
+          <polyline points="9 18 15 12 9 6"></polyline>
+        </svg>
       </button>
     </div>
     <button class="close-button" @click="$emit('close')">
@@ -71,20 +82,47 @@ defineEmits<{
 }
 
 .price-list-button {
-  background: transparent;
   border: none;
   font-size: 14px;
   font-weight: 600;
-  padding: 6px 12px;
-  border-radius: 16px;
+  padding: 8px 14px;
+  border-radius: 20px;
   cursor: pointer;
-  color: var(--tg-theme-link-color, #2481cc);
-  background-color: rgba(36, 129, 204, 0.1);
-  transition: background-color 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.price-list-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
 }
 
 .price-list-button:active {
-  background-color: rgba(36, 129, 204, 0.2);
+  transform: translateY(0);
+}
+
+.highlight-button {
+  animation: pulseHighlight 2s infinite;
+  font-weight: 700;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+@keyframes pulseHighlight {
+  0% {
+    box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.4);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(76, 175, 80, 0);
+    transform: scale(1.05);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(76, 175, 80, 0);
+    transform: scale(1);
+  }
 }
 
 .close-button {
@@ -92,34 +130,19 @@ defineEmits<{
   border: none;
   width: 36px;
   height: 36px;
+  padding: 8px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   color: var(--tg-theme-hint-color, #999999);
-  padding: 0;
-  position: relative;
-  transition: color 0.2s;
+  transition: all 0.2s ease;
 }
 
-.close-button:active {
+.close-button:hover {
+  background-color: rgba(0, 0, 0, 0.05);
   color: var(--tg-theme-text-color, #333333);
-}
-
-.pulse-button {
-  animation: pulse-outline 2s infinite;
-}
-
-@keyframes pulse-outline {
-  0% {
-    box-shadow: 0 0 0 0 rgba(255, 152, 0, 0.7);
-  }
-  70% {
-    box-shadow: 0 0 0 6px rgba(255, 152, 0, 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(255, 152, 0, 0);
-  }
 }
 
 @media (max-width: 480px) {

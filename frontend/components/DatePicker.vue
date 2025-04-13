@@ -41,12 +41,19 @@
     <!-- Блокирующий оверлей, когда компонент отключен -->
     <div v-if="disabled" class="disabled-overlay">
       <div class="disabled-message">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="10"></circle>
           <line x1="12" y1="8" x2="12" y2="12"></line>
           <line x1="12" y1="16" x2="12.01" y2="16"></line>
         </svg>
-        <span>Просмотрите прайс-лист перед записью</span>
+        <div class="message-title">Календарь заблокирован</div>
+        <div class="message-text">Для разблокировки календаря нажмите кнопку «Прайс-лист» вверху и ознакомьтесь с информацией</div>
+        <div class="arrow-up">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="19" x2="12" y2="5"></line>
+            <polyline points="5 12 12 5 19 12"></polyline>
+          </svg>
+        </div>
       </div>
     </div>
   </div>
@@ -396,7 +403,7 @@ watch(selectedDate, (newValue, oldValue) => {
 .disabled {
   position: relative;
   pointer-events: none;
-  opacity: 0.8;
+  opacity: 0.9;
 }
 
 .disabled-overlay {
@@ -405,12 +412,14 @@ watch(selectedDate, (newValue, oldValue) => {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(255, 255, 255, 0.7);
+  background-color: rgba(0, 0, 0, 0.6);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 10;
   border-radius: 12px;
+  backdrop-filter: blur(3px);
+  animation: fadeIn 0.3s ease;
 }
 
 .disabled-message {
@@ -419,22 +428,66 @@ watch(selectedDate, (newValue, oldValue) => {
   align-items: center;
   gap: 12px;
   text-align: center;
-  padding: 20px;
-  background-color: rgba(255, 255, 255, 0.9);
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  padding: 30px;
+  background-color: rgba(255, 255, 255, 0.95);
+  border-radius: 16px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+  max-width: 90%;
+  transform: translateY(0);
+  animation: bounceIn 0.5s ease;
 }
 
 .disabled-message svg {
   color: #ff9800;
-  width: 40px;
-  height: 40px;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 8px;
 }
 
-.disabled-message span {
-  font-size: 16px;
-  font-weight: 500;
+.message-title {
+  font-size: 18px;
+  font-weight: 600;
   color: var(--tg-theme-text-color, #333333);
+  margin-bottom: 4px;
+}
+
+.message-text {
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--tg-theme-hint-color, #666666);
+  margin-bottom: 8px;
+}
+
+.arrow-up {
+  color: #ff9800;
+  animation: bounce 2s infinite;
+  margin-top: 8px;
+}
+
+@keyframes bounce {
+  0%, 20%, 50%, 80%, 100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-20px);
+  }
+  60% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes bounceIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 /* ... existing styles ... */

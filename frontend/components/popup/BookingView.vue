@@ -2,12 +2,17 @@
   <div class="booking-view">
     <!-- Предупреждение если прайс-лист не просмотрен -->
     <div v-if="!isPriceListViewed" class="price-list-warning" :style="{ borderColor: color + '50' }">
-      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="10"></circle>
-        <line x1="12" y1="8" x2="12" y2="12"></line>
-        <line x1="12" y1="16" x2="12.01" y2="16"></line>
-      </svg>
-      <span>Пожалуйста, ознакомьтесь с прайс-листом перед записью</span>
+      <div class="warning-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+      </div>
+      <div class="warning-text">
+        <div class="warning-title">Необходим просмотр прайс-листа</div>
+        <div class="warning-description">Нажмите на кнопку «Прайс-лист» вверху, чтобы продолжить запись</div>
+      </div>
     </div>
     
     <!-- Строка с выбором специалиста и вводом породы -->
@@ -160,21 +165,53 @@ defineEmits<{
 }
 
 .price-list-warning {
-  margin-bottom: 15px;
-  padding: 12px;
-  border-radius: 8px;
-  background-color: rgba(255, 152, 0, 0.1);
-  border: 1px solid;
+  margin-bottom: 20px;
+  padding: 16px;
+  border-radius: 12px;
+  background-color: rgba(255, 152, 0, 0.15);
+  border: 2px solid;
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 14px;
+  gap: 15px;
   color: var(--tg-theme-text-color, #333);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  animation: pulse 2s infinite;
 }
 
-.price-list-warning svg {
+.warning-icon {
   flex-shrink: 0;
   color: #ff9800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.warning-text {
+  flex: 1;
+}
+
+.warning-title {
+  font-weight: 600;
+  font-size: 16px;
+  margin-bottom: 4px;
+  color: #ff9800;
+}
+
+.warning-description {
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 152, 0, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(255, 152, 0, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 152, 0, 0);
+  }
 }
 
 .full-width-calendar {
