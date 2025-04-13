@@ -77,6 +77,16 @@ provide('user', user);
 provide('isAuthenticated', isAuthenticated);
 provide('needsProfile', needsProfile);
 
+// Экспортируем состояние авторизации в глобальный объект
+if (typeof window !== 'undefined') {
+  window.__APP_STATE__ = window.__APP_STATE__ || {};
+  
+  // Наблюдаем за изменением состояния isAuthenticated
+  watch(isAuthenticated, (newValue) => {
+    window.__APP_STATE__.isAuthenticated = newValue;
+  }, { immediate: true });
+}
+
 // Определяем, находимся ли мы в тестовом режиме
 const isTestMode = computed(() => {
   return typeof window !== 'undefined' && (
@@ -198,6 +208,11 @@ const logError = (message, error) => {
   lastError.value = `${message}: ${error?.message || JSON.stringify(error)}`;
   return false;
 };
+
+// Экспортируем функцию logout в глобальный объект window
+if (typeof window !== 'undefined') {
+  window.logout = logout;
+}
 
 // Функция для инициализации WebApp
 const initializeWebApp = async () => {
@@ -325,6 +340,30 @@ const initTestMode = () => {
 onMounted(async () => {
   // Пытаемся инициализировать WebApp
   const isReady = await initializeWebApp();
+  
+  // Настроить слежение за изменениями в глобальном объекте __APP_STATE__
+  if (typeof window !== 'undefined') {
+    // Определяем и мониторим изменения в глобальном состоянии
+    if (!window.__APP_STATE__) {
+      window.__APP_STATE__ = {
+        isAuthenticated: isAuthenticated.value
+      };
+    }
+
+    // Мутация глобального состояния должна отражаться в локальном состоянии
+    Object.defineProperty(window.__APP_STATE__, 'isAuthenticated', {
+      get: () => isAuthenticated.value,
+      set: (value) => {
+        if (value === false && isAuthenticated.value === true) {
+          // Если состояние меняется с true на false, вызываем logout
+          logout();
+        } else if (isAuthenticated.value !== value) {
+          isAuthenticated.value = value;
+        }
+      },
+      enumerable: true
+    });
+  }
   
   // Добавляем глобальную функцию для показа уведомлений
   if (typeof window !== 'undefined') {

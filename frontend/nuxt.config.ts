@@ -71,5 +71,10 @@ export default defineNuxtConfig({
         }
       }
     }
-  }
+  },
+
+  plugins: [
+    '~/plugins/axios.client.js',
+    '~/plugins/auth.client.js',
+  ],
 })
