@@ -28,6 +28,7 @@
         :description="card.description"
         :image="card.image"
         :color="card.color"
+        :fallback-image="card.fallbackImage"
         @date-selected="handleDateSelected"
         @debug-log="handleDebugLog"
       />
@@ -110,6 +111,7 @@
 import { ref, onMounted, inject, computed, watch } from 'vue';
 import CardItem from '../components/CardItem.vue';
 import { useRuntimeConfig } from '#app';
+import { useLocalImages } from '../composables/useLocalImages';
 
 // Получаем доступ к WebApp и теме из провайдера
 const isTelegramWebAppAvailable = inject('isTelegramWebAppAvailable', false);
@@ -121,6 +123,9 @@ const initData = inject('initData', null);
 const user = inject('user', null);
 const logout = inject('logout', () => {});
 
+// Импортируем composable для работы с локальными изображениями
+const { getCategoryImage, handleImageError } = useLocalImages();
+
 // Данные карточек
 const cards = ref([
   {
@@ -128,28 +133,32 @@ const cards = ref([
     title: 'Массаж',
     description: 'Индивидуальные программы тренировок',
     color: '#4caf50',
-    image: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80'
+    image: getCategoryImage('cards', 'massage.jpg'),
+    fallbackImage: '/images/fallback/default.jpg'
   },
   {
     id: 2,
     title: 'Занятие в бассейне',
     description: 'Персональный план питания',
     color: '#2196f3',
-    image: 'https://images.unsplash.com/photo-1490645935967-10de6ba17061?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80'
+    image: getCategoryImage('cards', 'pool.jpg'),
+    fallbackImage: '/images/fallback/default.jpg'
   },
   {
     id: 3,
     title: 'Аренда бассейна',
     description: 'Отслеживание результатов',
     color: '#ff9800',
-    image: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80'
+    image: getCategoryImage('cards', 'pool-rent.jpg'),
+    fallbackImage: '/images/fallback/default.jpg'
   },
   {
     id: 4,
     title: 'Занятие с хендлером',
     description: 'Консультации тренера',
     color: '#9c27b0',
-    image: 'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80'
+    image: getCategoryImage('cards', 'trainer.jpg'),
+    fallbackImage: '/images/fallback/default.jpg'
   }
 ]);
 

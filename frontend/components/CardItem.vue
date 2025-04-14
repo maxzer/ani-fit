@@ -1,7 +1,7 @@
 <template>
   <div class="card-wrapper">
     <div class="card-item" @click="showPopup">
-      <div class="card-image" :style="{ backgroundImage: `url(${image})` }">
+      <div class="card-image" :style="{ backgroundImage: `url(${displayedImage})` }">
         <div v-if="!imageExists" class="card-placeholder" :style="{ backgroundColor: color + '30' }">{{ title.charAt(0) }}</div>
       </div>
       <div class="card-content">
@@ -28,6 +28,7 @@
 <script setup>
 import { ref, onMounted, inject } from 'vue';
 import CardPopup from './CardPopup.vue';
+import { useLocalImages } from '../composables/useLocalImages';
 
 const props = defineProps({
   title: {
@@ -45,6 +46,10 @@ const props = defineProps({
   color: {
     type: String,
     default: '#4caf50' // Зеленый по умолчанию
+  },
+  fallbackImage: {
+    type: String,
+    default: '/images/fallback/default.jpg'
   }
 });
 
@@ -53,9 +58,13 @@ const imageExists = ref(false);
 const isPopupVisible = ref(false);
 const selectedDate = ref(null);
 const isPriceListViewed = ref(false);
+const displayedImage = ref(props.image);
 
 // Получаем данные пользователя из глобального состояния
 const user = inject('user', null);
+
+// Импортируем функции для работы с локальными изображениями
+const { handleImageError } = useLocalImages();
 
 // Проверка существования изображения и загрузка статуса просмотра прайс-листа
 onMounted(async () => {
@@ -63,6 +72,11 @@ onMounted(async () => {
     const img = new Image();
     img.onload = () => {
       imageExists.value = true;
+      displayedImage.value = props.image;
+    };
+    img.onerror = () => {
+      imageExists.value = false;
+      displayedImage.value = props.fallbackImage;
     };
     img.src = props.image;
   }
