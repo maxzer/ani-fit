@@ -243,27 +243,6 @@ const closePopup = () => {
   overflow: hidden;
 }
 
-.card-image::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(45deg, rgba(0, 0, 0, 0.3), transparent);
-  z-index: 1;
-}
-
-.card-image::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 80px;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.5), transparent);
-}
-
 .card-placeholder {
   display: flex;
   align-items: center;
