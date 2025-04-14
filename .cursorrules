@@ -1,0 +1,40 @@
+# Ani-Fit Project Rules
+
+## Project Structure
+- Frontend code is in the `frontend/` directory using Nuxt.js
+- Backend code is in the `backend/` directory using Fastify
+- Docker configuration is in `docker-compose.yml` and related files
+- Nginx configuration is in the `nginx/` directory
+- Local images are stored in `frontend/public/images/` organized by category
+
+## Coding Standards
+- Use TypeScript for type safety in all new code
+- Follow Vue 3 composition API patterns for frontend components
+- Maintain clear separation between frontend and backend concerns
+- Document API endpoints and data models
+- Use local image paths instead of external URLs when possible
+
+## Asset Management Guidelines
+- Store all images in appropriate subdirectories in `frontend/public/images/`
+- Use the `useLocalImages()` composable for consistent image path handling
+- Implement proper fallbacks for missing or failed images
+- Optimize images before adding them to the project
+- Follow the naming conventions in images/README.md
+
+## Workflow Patterns
+- Use npm scripts defined in package.json for development tasks
+- Follow Memory Bank documentation practices for project changes
+- Update activeContext.md and progress.md with each significant change
+- Use descriptive commit messages for version control
+
+## Learning Journey
+- Project is a fitness tracking application with user authentication
+- Uses modern web development stack (Nuxt.js, Fastify, TypeScript)
+- Follows containerized deployment approach with Docker
+- Implements JWT authentication for secure user management
+- Incorporates local asset management for performance and reliability
+
+## User Preferences
+- To be discovered and documented as we work with the user
+
+This file will be updated as we learn more about the project and user preferences. 
