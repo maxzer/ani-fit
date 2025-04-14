@@ -299,8 +299,8 @@ const loadUserEvents = async () => {
         googleEventId: event.googleEventId
       }));
       
-      // Сортируем события по дате (от ближайшей к более поздней)
-      scheduledEvents.value.sort((a, b) => new Date(a.date) - new Date(b.date));
+      // Сортируем события по дате (от новых к старым)
+      scheduledEvents.value.sort((a, b) => new Date(b.date) - new Date(a.date));
       
       console.log('Загружено событий:', scheduledEvents.value.length);
     } else {
@@ -346,8 +346,8 @@ const handleDateSelected = (eventData) => {
     color: eventData.color
   });
   
-  // Сортируем события по дате (от ближайшей к более поздней)
-  scheduledEvents.value.sort((a, b) => new Date(a.date) - new Date(b.date));
+  // Сортируем события по дате (от новых к старым)
+  scheduledEvents.value.sort((a, b) => new Date(b.date) - new Date(a.date));
   
   // Показываем нативное уведомление
   showNotification(`Вы успешно запланировали: ${eventData.title} на ${formatDate(eventData.date)}`);
