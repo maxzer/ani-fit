@@ -29,6 +29,7 @@ import { getTelegramTheme, isTelegramWebAppReady, getInitData } from './utils/te
 import TelegramLogin from './components/TelegramLogin.vue';
 import '@/assets/css/theme.css';
 import axios from 'axios';
+import { navigateTo } from '#app';
 
 // Отладочные переменные
 const showDebug = ref(false);
@@ -124,26 +125,34 @@ const setTempAuth = (token, userData) => {
 };
 
 // Выход из аккаунта
-const logout = async () => {
+const logout = async (shouldRedirect = true) => {
   try {
     console.log('Выполняется выход из системы...');
     
+    // Очищаем данные авторизации сначала в оперативной памяти
+    isAuthenticated.value = false;
+    
     // Отправляем запрос на сервер для инвалидации токена
-    if (apiUrl) {
-      try {
-        await axios.post(`${apiUrl}/api/auth/logout`);
-        console.log('Успешно выполнен запрос на выход из системы на сервере');
-      } catch (error) {
-        console.error('Ошибка при отправке запроса на выход:', error);
-        // Продолжаем процесс выхода даже при ошибке запроса
+    // Но делаем это в фоне, не блокируя процесс выхода
+    const logoutPromise = async () => {
+      if (apiUrl) {
+        try {
+          await axios.post(`${apiUrl}/api/auth/logout`);
+          console.log('Успешно выполнен запрос на выход из системы на сервере');
+        } catch (error) {
+          console.error('Ошибка при отправке запроса на выход:', error);
+          // Продолжаем процесс выхода даже при ошибке запроса
+        }
       }
-    }
+    };
+    
+    // Запускаем в фоне
+    logoutPromise();
     
     // Очищаем данные авторизации
     authToken.value = '';
     tempAuthToken.value = '';
     user.value = null;
-    isAuthenticated.value = false;
     needsProfile.value = false;
     
     // Очищаем все данные из localStorage
@@ -167,6 +176,11 @@ const logout = async () => {
     delete axios.defaults.headers.common['Authorization'];
     
     console.log('Выход из системы выполнен успешно');
+    
+    // Если нужно перенаправить на главную страницу (экран логина)
+    if (shouldRedirect && typeof navigateTo === 'function') {
+      navigateTo('/', { replace: true });
+    }
   } catch (error) {
     console.error('Ошибка при выходе из системы:', error);
     // Даже при ошибке пытаемся очистить все локальные данные
@@ -174,6 +188,11 @@ const logout = async () => {
       localStorage.clear();
     }
     delete axios.defaults.headers.common['Authorization'];
+    
+    // При ошибке также перенаправляем на главную
+    if (shouldRedirect && typeof navigateTo === 'function') {
+      navigateTo('/', { replace: true });
+    }
   }
 };
 

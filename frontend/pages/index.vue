@@ -309,19 +309,9 @@ const loadUserEvents = async () => {
 const handleLogout = () => {
   // Выполняем логаут
   logout();
-  
-  // Показываем уведомление
-  showNotification('Вы успешно вышли из аккаунта', 'info');
-  
-  // Добавляем задержку перед закрытием приложения (1.5 секунды),
-  // чтобы пользователь успел увидеть уведомление
-  setTimeout(() => {
-    // Проверяем доступность Telegram WebApp API
-    if (window.Telegram && window.Telegram.WebApp) {
-      // Закрываем приложение
-      window.Telegram.WebApp.close();
-    }
-  }, 1500);
+
+  // Закрываем приложение
+  window.Telegram.WebApp.close();
 };
 
 // Функция для показа нативного уведомления

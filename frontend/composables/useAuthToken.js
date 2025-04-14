@@ -26,6 +26,34 @@ export const useAuthToken = () => {
     }
   };
 
+  // Проверка валидности токена (базовая структурная проверка)
+  const isTokenValid = (token) => {
+    if (!token || typeof token !== 'string') return false;
+    
+    try {
+      // Разделяем JWT на части
+      const parts = token.split('.');
+      if (parts.length !== 3) return false;
+      
+      // Проверяем, можно ли декодировать payload
+      const payload = JSON.parse(atob(parts[1]));
+      
+      // Проверка на expired
+      if (payload.exp) {
+        const expTimestamp = payload.exp * 1000; // JWT exp в секундах, JS timestamp в миллисекундах
+        if (Date.now() >= expTimestamp) {
+          console.warn('Токен истек по времени');
+          return false;
+        }
+      }
+      
+      return true;
+    } catch (e) {
+      console.error('Ошибка при проверке токена:', e);
+      return false;
+    }
+  };
+
   // Функция для обновления токена авторизации
   const refreshAuthToken = async () => {
     try {
@@ -38,6 +66,7 @@ export const useAuthToken = () => {
         return await refreshStandardToken();
       }
     } catch (error) {
+      console.error('Ошибка при обновлении токена:', error);
       return null;
     }
   };
@@ -87,7 +116,7 @@ export const useAuthToken = () => {
         return saveAndReturnToken(data.accessToken);
       }
     } catch (error) {
-      // Игнорируем ошибки
+      console.error('Ошибка при обновлении токена через Telegram:', error);
     }
     
     return null;
@@ -118,7 +147,7 @@ export const useAuthToken = () => {
         return saveAndReturnToken(data.accessToken);
       }
     } catch (error) {
-      // Игнорируем ошибки
+      console.error('Ошибка при обновлении стандартного токена:', error);
     }
     
     return null;
@@ -126,6 +155,17 @@ export const useAuthToken = () => {
 
   // Сохранение и возврат полученного токена
   const saveAndReturnToken = async (token) => {
+    if (!token || typeof token !== 'string') {
+      console.error('Получен некорректный токен');
+      return null;
+    }
+    
+    // Проверяем валидность токена
+    if (!isTokenValid(token)) {
+      console.error('Полученный токен не прошел валидацию');
+      return null;
+    }
+    
     if (typeof window !== 'undefined') {
       // Сохраняем токен в глобальную переменную
       window.authToken = token;
@@ -186,6 +226,24 @@ export const useAuthToken = () => {
           // Игнорируем ошибки доступа
         }
       }
+      
+      // Проверяем валидность полученного токена
+      if (authToken && !isTokenValid(authToken)) {
+        console.warn('Получен невалидный токен, сбрасываем');
+        authToken = '';
+        
+        // Очищаем невалидный токен из хранилища
+        try {
+          localStorage.removeItem('authToken');
+        } catch (e) {
+          // Игнорируем ошибки localStorage
+        }
+        
+        // Удаляем заголовок авторизации
+        if (window.axios) {
+          delete window.axios.defaults.headers.common['Authorization'];
+        }
+      }
     }
     
     return authToken;
@@ -194,6 +252,7 @@ export const useAuthToken = () => {
   return {
     initAuthToken,
     refreshAuthToken,
-    getAuthToken
+    getAuthToken,
+    isTokenValid
   };
 }; 

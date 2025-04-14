@@ -7,7 +7,7 @@
         v-for="slot in timeSlots" 
         :key="slot.value" 
         class="time-slot-btn" 
-        :class="{ 'active': modelValue.timeSlot === slot.value }"
+        :class="{ 'active': isActiveTimeSlot(slot.value) }"
         @click="selectTimeSlot(slot.value)">
         {{ slot.label }}
       </button>
@@ -32,7 +32,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 
 // Определяем props
 const props = defineProps({
@@ -65,12 +65,25 @@ const props = defineProps({
 // Определяем события
 const emit = defineEmits(['update:hour', 'update:minute', 'update:timeSlot', 'update:time']);
 
+// Локальное отслеживание активного слота для более надежной реактивности
+const activeTimeSlot = ref(props.timeSlot || props.modelValue.timeSlot);
+
+// Функция для проверки активного слота
+const isActiveTimeSlot = (slotValue) => {
+  return activeTimeSlot.value === slotValue || 
+         props.timeSlot === slotValue || 
+         props.modelValue.timeSlot === slotValue;
+};
+
 // Вычисляемые свойства для двусторонней привязки
 const hourModel = computed({
   get: () => props.hour,
   set: (value) => {
     emit('update:hour', value);
     emit('update:time');
+    
+    // При ручном изменении времени, проверяем соответствует ли оно какому-либо таймслоту
+    updateTimeSlotFromHourMinute(value, minuteModel.value);
   }
 });
 
@@ -79,8 +92,28 @@ const minuteModel = computed({
   set: (value) => {
     emit('update:minute', value);
     emit('update:time');
+    
+    // При ручном изменении времени, проверяем соответствует ли оно какому-либо таймслоту
+    updateTimeSlotFromHourMinute(hourModel.value, value);
   }
 });
+
+// Функция для обновления таймслота при изменении часов/минут
+const updateTimeSlotFromHourMinute = (hour, minute) => {
+  const timeString = `${hour}:${minute === 0 ? '00' : minute}`;
+  
+  // Проверяем, соответствует ли выбранное время одному из предопределенных слотов
+  const matchingSlot = props.timeSlots.find(slot => slot.value === timeString);
+  
+  if (matchingSlot) {
+    activeTimeSlot.value = matchingSlot.value;
+    emit('update:timeSlot', matchingSlot.value);
+  } else {
+    // Если не найдено соответствие, сбрасываем выбранный таймслот
+    activeTimeSlot.value = null;
+    emit('update:timeSlot', null);
+  }
+};
 
 // Доступные часы и минуты
 const hours = Array.from({ length: 13 }, (_, i) => i + 10); // от 10 до 22
@@ -88,11 +121,16 @@ const minutes = [0, 30]; // только 0 и 30 минут
 
 // Функция выбора временного слота
 const selectTimeSlot = (timeSlot) => {
+  // Обновляем локальное состояние
+  activeTimeSlot.value = timeSlot;
+  
+  // Отправляем событие обновления
   emit('update:timeSlot', timeSlot);
   
+  // Обновляем часы и минуты на основе выбранного слота
   const [hours, minutes] = timeSlot.split(':');
   emit('update:hour', parseInt(hours));
-  emit('update:minute', parseInt(minutes));
+  emit('update:minute', parseInt(minutes) || 0);
   emit('update:time');
 };
 </script>
@@ -104,7 +142,6 @@ const selectTimeSlot = (timeSlot) => {
   border-radius: 12px;
   padding: 16px;
   margin-bottom: 16px;
-  animation: fadeIn 0.3s ease;
 }
 
 .time-picker-header {
@@ -132,12 +169,13 @@ const selectTimeSlot = (timeSlot) => {
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.2s ease;
 }
 
 .time-slot-btn.active {
-  background-color: var(--tg-theme-button-color, #2481cc);
-  color: var(--tg-theme-button-text-color, #ffffff);
+  background-color: var(--tg-theme-button-color, #2481cc) !important;
+  color: var(--tg-theme-button-text-color, #ffffff) !important;
+  font-weight: 600;
+  box-shadow: 0 2px 6px rgba(36, 129, 204, 0.3);
 }
 
 .time-picker-custom {
@@ -188,16 +226,5 @@ const selectTimeSlot = (timeSlot) => {
   border-color: rgba(255, 255, 255, 0.2);
   color: var(--tg-theme-text-color, #e0e0e0);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23ccc' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 </style> 

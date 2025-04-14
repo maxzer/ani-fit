@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { navigateTo } from '#app';
 
 export default defineNuxtPlugin((nuxtApp) => {
   // Создаем глобальный экземпляр axios
@@ -10,7 +11,7 @@ export default defineNuxtPlugin((nuxtApp) => {
     (error) => {
       // Если получена ошибка 401 - токен истек
       if (error.response && error.response.status === 401) {
-        console.error('Токен авторизации истек. Перенаправление на страницу логина.');
+        console.error('Токен авторизации истек. Выполняется выход из системы.');
         
         // Очищаем данные авторизации из localStorage
         if (typeof window !== 'undefined') {
@@ -20,7 +21,7 @@ export default defineNuxtPlugin((nuxtApp) => {
           // Удаляем заголовок авторизации
           delete axios.defaults.headers.common['Authorization'];
           
-          // Показываем уведомление пользователю
+          // Показываем уведомление пользователю, если доступна функция
           if (typeof window.showNotification === 'function') {
             window.showNotification('Срок действия авторизации истек. Выполняется перенаправление...', 'error');
           }
@@ -39,13 +40,14 @@ export default defineNuxtPlugin((nuxtApp) => {
           const globalState = window.__APP_STATE__ = window.__APP_STATE__ || {};
           globalState.isAuthenticated = false;
           
-          // Если есть доступ к функциям logout из app.vue
+          // Если доступен logout из контекста приложения
           if (typeof window.logout === 'function') {
             window.logout();
           }
           
-          // Перезагружаем страницу без задержки для немедленного перехода на страницу логина
-          window.location.reload();
+          // Бесшовное перенаправление на главную страницу (где отобразится экран логина)
+          // вместо перезагрузки страницы
+          navigateTo('/', { replace: true });
         }
       }
       

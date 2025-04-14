@@ -4,6 +4,8 @@
  */
 
 import { useAuthToken } from '~/composables/useAuthToken';
+import showNotification from '~/utils/notification';
+import { navigateTo } from '#app';
 
 export default defineNuxtPlugin((nuxtApp) => {
   // Задаем интервал проверки токена (30 секунд)
@@ -17,8 +19,8 @@ export default defineNuxtPlugin((nuxtApp) => {
       return;
     }
     
-    // Получаем текущий токен
-    const { getAuthToken } = useAuthToken();
+    // Получаем текущий токен и функцию проверки
+    const { getAuthToken, isTokenValid } = useAuthToken();
     const token = getAuthToken();
     
     // Если токена нет, сразу отмечаем как неавторизованного
@@ -27,8 +29,14 @@ export default defineNuxtPlugin((nuxtApp) => {
       return;
     }
     
+    // Проверяем локально структуру и срок действия токена
+    if (!isTokenValid(token)) {
+      handleInvalidToken('Срок действия токена истек или токен недействителен');
+      return;
+    }
+    
     try {
-      // Проверяем токен через API
+      // Дополнительно проверяем токен через API (опционально)
       const apiUrl = nuxtApp.$config.public.apiUrl || 'https://maxzer.ru';
       const response = await fetch(`${apiUrl}/api/auth/validate-token`, {
         method: 'GET',
@@ -37,9 +45,9 @@ export default defineNuxtPlugin((nuxtApp) => {
         }
       });
       
-      // Если получаем 401, значит токен недействителен
+      // Если получаем 401, значит токен недействителен на сервере
       if (response.status === 401) {
-        handleInvalidToken();
+        handleInvalidToken('Сервер отклонил токен авторизации');
         return;
       }
       
@@ -48,17 +56,20 @@ export default defineNuxtPlugin((nuxtApp) => {
       
       // Если API сообщает, что токен недействителен
       if (data && data.valid === false) {
-        handleInvalidToken();
+        handleInvalidToken(data.message || 'Токен недействителен');
       }
     } catch (error) {
-      // Ошибки сети или другие проблемы - игнорируем
-      console.error('Ошибка при проверке токена:', error);
+      // Ошибки сети не считаем фатальными - просто логируем
+      console.error('Ошибка при проверке токена через API:', error);
     }
   };
   
   // Обработка недействительного токена
-  const handleInvalidToken = () => {
+  const handleInvalidToken = (message = 'Сессия истекла. Выполняется перенаправление...') => {
     if (typeof window !== 'undefined') {
+      // Показываем уведомление
+      showNotification(message, 'error');
+      
       // Очищаем данные авторизации
       localStorage.removeItem('authToken');
       localStorage.removeItem('user');
@@ -75,10 +86,10 @@ export default defineNuxtPlugin((nuxtApp) => {
       // Вызываем функцию выхода из app.vue, если доступна
       if (typeof window.logout === 'function') {
         window.logout();
+      } else {
+        // Если logout функция недоступна, выполняем перенаправление вручную
+        navigateTo('/', { replace: true });
       }
-      
-      // Обновляем страницу для показа экрана логина
-      window.location.reload();
     }
   };
   

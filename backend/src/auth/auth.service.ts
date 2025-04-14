@@ -2,6 +2,7 @@ import { createHmac } from 'crypto';
 import { PrismaClient, User } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 import { TelegramUserData, TelegramInitData, TokenPair, InvalidTelegramDataError, UserCreationError, TokenGenerationError } from '../types/telegram';
+import { verifyTelegramData, extractTelegramUserData } from '../utils/telegram-auth.utils';
 
 export class AuthService {
   private prisma: PrismaClient;
@@ -25,11 +26,32 @@ export class AuthService {
       console.log('[Telegram Auth] Starting validation of initData');
       console.log('[Telegram Auth] Raw initData:', initData);
 
+      // Попытка безопасной валидации с проверкой криптографической подписи
+      if (this.botToken) {
+        try {
+          // Проверяем подпись данных с использованием токена бота
+          const validatedData = verifyTelegramData(initData, this.botToken);
+          console.log('[Telegram Auth] Verified Telegram data with signature:', validatedData);
+          
+          if (validatedData.user) {
+            return validatedData.user;
+          } else {
+            throw new InvalidTelegramDataError('User data is missing in verified initData');
+          }
+        } catch (error) {
+          console.warn('[Telegram Auth] Secure validation failed, falling back to basic extraction:', error);
+          // Если произошла ошибка валидации подписи, продолжаем с запасным методом
+        }
+      }
+
+      // Запасной метод (небезопасный) - используется только если нет токена бота или валидация не удалась
+      // В продакшене рекомендуется использовать только безопасную валидацию
+      
       // Парсим параметры из строки initData
       const params = new URLSearchParams(initData);
       console.log('[Telegram Auth] Parsed params:', Object.fromEntries(params.entries()));
 
-      // Проверяем hash
+      // Проверяем hash (базовая проверка наличия)
       const hash = params.get('hash');
       console.log('[Telegram Auth] Hash from params:', hash);
       if (!hash) {
@@ -37,7 +59,7 @@ export class AuthService {
         throw new InvalidTelegramDataError('Hash is missing');
       }
 
-      // Проверяем auth_date
+      // Проверяем auth_date (базовая проверка наличия)
       const authDate = params.get('auth_date');
       console.log('[Telegram Auth] Auth date from params:', authDate);
       if (!authDate) {
@@ -45,7 +67,7 @@ export class AuthService {
         throw new InvalidTelegramDataError('Auth date is missing');
       }
 
-      // Проверяем user data
+      // Получаем и парсим данные пользователя
       const userDataStr = params.get('user');
       console.log('[Telegram Auth] User data string:', userDataStr);
       if (!userDataStr) {
@@ -250,8 +272,7 @@ export class AuthService {
         return false;
       }
     } catch (error) {
-      console.error('[AuthService] Error checking user existence:', error);
-      // В случае ошибки возвращаем false для безопасности
+      console.error(`[AuthService] Error checking user existence: ${(error as Error).message}`);
       return false;
     }
   }

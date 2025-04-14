@@ -22,6 +22,16 @@ export default defineNuxtConfig({
         { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' },
         { name: 'theme-color', content: '#ffffff' }
       ]
+    },
+    // Добавляем анимацию переходов между страницами
+    pageTransition: {
+      name: 'page',
+      mode: 'out-in'
+    },
+    // Анимация для основного лейаута
+    layoutTransition: {
+      name: 'fade',
+      mode: 'out-in'
     }
   },
 
@@ -72,6 +82,12 @@ export default defineNuxtConfig({
       }
     }
   },
+
+  // Подключаем глобальные CSS стили
+  css: [
+    '~/assets/css/theme.css',
+    '~/assets/css/transitions.css',
+  ],
 
   plugins: [
     '~/plugins/axios.client.js',
